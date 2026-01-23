@@ -1,0 +1,52 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.listen</groupId>
+        <artifactId>listen-test</artifactId>
+        <version>0.0.1-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>listen-admin</artifactId>
+    <name>Listen Admin</name>
+    <description>Admin module for the Listen project</description>
+
+    <dependencies>
+<!--        <dependency>-->
+<!--            <groupId>com.example.common</groupId>-->
+<!--            <artifactId>listen-common</artifactId>-->
+<!--            <version>0.0.1-SNAPSHOT</version>-->
+<!--        </dependency>-->
+        <dependency>
+            <groupId>com.listen</groupId>
+            <artifactId>listen-wx</artifactId>
+            <version>0.0.1-SNAPSHOT</version>
+<!--            <scope>compile</scope>-->
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <configuration>
+                    <mainClass>com.example.admin.adminApplication</mainClass>
+                </configuration>
+            </plugin>
+        </plugins>
+        <resources>
+
+            <resource>
+                <directory>src/main/resources</directory>
+                <includes>
+                    <include>**/*</include>
+                </includes>
+                <filtering>true</filtering>
+            </resource>
+        </resources>
+    </build>
+    <packaging>jar</packaging>
+
+</project>

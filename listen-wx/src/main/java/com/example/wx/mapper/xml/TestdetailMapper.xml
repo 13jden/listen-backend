@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.example.wx.mapper.TestdetailMapper">
+
+    <!-- 通用查询映射结果 -->
+    <resultMap id="BaseResultMap" type="com.example.wx.pojo.Testdetail">
+        <id column="id" property="id" />
+        <result column="test_id" property="testId" />
+        <result column="audio_id" property="audioId" />
+        <result column="user_audio_path" property="userAudioPath" />
+        <result column="`index`" property="index" />  <!-- 用反引号包裹 index -->
+        <result column="score" property="score" />
+        <result column="test_time" property="testTime" />
+        <result column="user_content" property="userContent" />
+    </resultMap>
+
+    <!-- 通用查询结果列 -->
+    <sql id="Base_Column_List">
+        id, test_id, audio_id, user_audio_path, `index`, score, user_content, test_time  <!-- 用反引号包裹 index -->
+    </sql>
+
+</mapper>
