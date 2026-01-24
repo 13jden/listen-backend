@@ -1,0 +1,16 @@
+services:
+  health-app:
+    image: crpi-aer4k3m8uw2sue3f.cn-hangzhou.personal.cr.aliyuncs.com/dzkdzk/listen:latest
+    container_name: listen-spring-app
+    restart: unless-stopped
+    ports:
+      - "8081:8081"
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+      - TZ=Asia/Shanghai
+      - JAVA_OPTS=-Xms512m -Xmx1g -XX:+UseG1GC
+    volumes:
+      - ./logs:/app/logs
+      - ./config:/app/config
+      # 挂载文件上传目录
+#      - /opt/health/files:/opt/health/files
