@@ -23,7 +23,7 @@ jobs:
         run: mvn dependency:purge-local-repository -DmanualInclude="com.dzk:listen-backend"
 
       - name: Build with Maven
-        run: mvn clean package -pl admin -am -DskipTests
+        run: mvn clean package -pl listen-admin -am -DskipTests
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
