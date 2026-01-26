@@ -9,17 +9,19 @@ ENV TZ=Asia/Shanghai
 
 # 复制 Maven 配置文件
 COPY pom.xml .
-COPY listen-common/pom.xml common/
-COPY listen-wx/pom.xml wx/
-COPY listen-admin/pom.xml  admin/
+# 创建正确的模块目录结构
+RUN mkdir -p listen-common listen-wx listen-admin
+COPY listen-common/pom.xml listen-common/
+COPY listen-wx/pom.xml listen-wx/
+COPY listen-admin/pom.xml listen-admin/
 
 # 下载依赖（先下载依赖以利用 Docker 缓存）
 RUN mvn dependency:go-offline -B
 
 # 复制源代码
-COPY listen-common/src common/src
-COPY listen-wx/src wx/src
-COPY listen-admin/src admin/src
+COPY listen-common/src listen-common/src
+COPY listen-wx/src listen-wx/src
+COPY listen-admin/src listen-admin/src
 
 # 构建应用 - 修复：明确指定要构建的模块
 RUN mvn clean package -pl admin -am -DskipTests -B
@@ -40,7 +42,7 @@ RUN apk add --no-cache curl
 ENV SPRING_PROFILES_ACTIVE=prod
 
 # 复制构建好的jar文件
-COPY --from=builder /app/admin/target/admin-*.jar app.jar
+COPY --from=builder /app/listen-admin/target/admin-*.jar app.jar
 
 # 暴露端口
 EXPOSE 8081
