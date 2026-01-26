@@ -5,13 +5,13 @@
 
 
     <parent>
-        <groupId>com.listen</groupId>
+        <groupId>com.example</groupId>
         <artifactId>listen-test</artifactId>
         <version>0.0.1-SNAPSHOT</version>
     </parent>
 
     <artifactId>listen-common</artifactId>
-    <groupId>com.example.common</groupId>
+    <groupId>com.example</groupId>
     <version>0.0.1-SNAPSHOT</version>
     <name>Listen Common</name>
     <description>Common utilities and shared components for the Listen project</description>

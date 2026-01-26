@@ -3,11 +3,12 @@
     <modelVersion>4.0.0</modelVersion>
 
     <parent>
-        <groupId>com.listen</groupId>
+        <groupId>com.example</groupId>
         <artifactId>listen-test</artifactId>
         <version>0.0.1-SNAPSHOT</version>
     </parent>
 
+    <groupId>com.example</groupId>
     <artifactId>listen-wx</artifactId>
     <name>Listen WX</name>
     <description>WeChat-related module for the Listen project</description>
@@ -168,7 +169,7 @@
         </dependency>
 
         <dependency>
-            <groupId>com.example.common</groupId>
+            <groupId>com.example</groupId>
             <artifactId>listen-common</artifactId>
             <version>0.0.1-SNAPSHOT</version>
             <scope>compile</scope>
@@ -176,13 +177,13 @@
     </dependencies>
     <build>
         <plugins>
-<!--            <plugin>-->
-<!--                <groupId>org.springframework.boot</groupId>-->
-<!--                <artifactId>spring-boot-maven-plugin</artifactId>-->
-<!--                <configuration>-->
-<!--                    <mainClass>com.example.wx.WxApplication</mainClass>-->
-<!--                </configuration>-->
-<!--            </plugin>-->
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <configuration>
+                    <skip>true</skip>
+                </configuration>
+            </plugin>
         </plugins>
         <resources>
             <resource>
@@ -191,14 +192,6 @@
                     <include>**/*</include>
                 </includes>
             </resource>
-            <resource>
-                <directory>src/main/java</directory>
-                <includes>
-                    <include>**/*.xml</include>
-                </includes>
-            </resource>
         </resources>
     </build>
-    <packaging>jar</packaging>
-
 </project>
