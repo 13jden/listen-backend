@@ -3,7 +3,7 @@ package com.example.admin.controller;
 
 import com.example.common.common.ControllerTool;
 import com.example.common.common.Result;
-import com.example.common.common.wxLoginTool;
+import com.example.common.common.WxLoginTool;
 import com.example.common.constants.Constants;
 import com.example.common.dto.TokenUserInfoDto;
 import com.example.common.dto.UserInfoDto;
@@ -39,7 +39,7 @@ public class UserController {
     private UserService userService;
 
     @Autowired
-    private wxLoginTool wxLoginTool;
+    private WxLoginTool wxLoginTool;
 
     @PostMapping("/register")
     public Result register(HttpServletRequest request,

@@ -13,4 +13,4 @@ services:
       - ./logs:/app/logs
       - ./config:/app/config
       # 挂载文件上传目录
-#      - /opt/health/files:/opt/health/files
+      - /opt/listen/files:/opt/listen/files

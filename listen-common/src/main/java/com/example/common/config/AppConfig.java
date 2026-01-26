@@ -12,6 +12,12 @@ public class AppConfig {
     @Value("${admin.password}")
     private String adminPassword;
 
+    @Value("${wx.app-id:}")
+    private String wxAppId;
+
+    @Value("${wx.app-secret:}")
+    private String wxAppSecret;
+
 
     public String getAdminAccount() {
         return adminAccount;
@@ -27,5 +33,21 @@ public class AppConfig {
 
     public void setAdminPassword(String adminPassword) {
         this.adminPassword = adminPassword;
+    }
+
+    public String getWxAppId() {
+        return wxAppId;
+    }
+
+    public void setWxAppId(String wxAppId) {
+        this.wxAppId = wxAppId;
+    }
+
+    public String getWxAppSecret() {
+        return wxAppSecret;
+    }
+
+    public void setWxAppSecret(String wxAppSecret) {
+        this.wxAppSecret = wxAppSecret;
     }
 }

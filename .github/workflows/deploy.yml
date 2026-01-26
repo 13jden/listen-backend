@@ -107,7 +107,7 @@ jobs:
             if docker compose version &> /dev/null; then
               echo "使用 docker compose V2"
               docker compose down || true
-              mkdir -p /opt/listen/files/diet
+              mkdir -p /opt/listen/files/audio
               docker compose up -d
             else
               echo "使用 docker-compose"
@@ -120,7 +120,7 @@ jobs:
             sleep 5
 
             # 检查容器内文件目录是否存在
-            docker exec listen-spring-app ls -la /opt/listen/files/diet || echo "警告: 容器内文件目录检查失败"
+            docker exec listen-spring-app ls -la /opt/listen/files/audio || echo "警告: 容器内文件目录检查失败"
 
             # 清理旧镜像
             docker image prune -f
