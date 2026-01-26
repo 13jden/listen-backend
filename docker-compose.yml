@@ -1,6 +1,6 @@
 services:
   health-app:
-    image: crpi-aer4k3m8uw2sue3f.cn-hangzhou.personal.cr.aliyuncs.com/dzkdzk/listen:latest
+    image: crpi-aer4k3m8uw2sue3f.cn-hangzhou.personal.cr.aliyuncs.com/dzkdzk/listen-backend:latest
     container_name: listen-spring-app
     restart: unless-stopped
     ports:

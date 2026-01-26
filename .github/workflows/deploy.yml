@@ -20,10 +20,10 @@ jobs:
           cache: 'maven'
 
       - name: Clean Maven cache
-        run: mvn dependency:purge-local-repository -DmanualInclude="com.dzk:listen-backend"
+        run: mvn dependency:purge-local-repository -DmanualInclude="com.listen:listen-test"
 
       - name: Build with Maven
-        run: mvn clean package -pl listen-admin -am -DskipTests
+        run: mvn clean install -pl listen-admin -am -DskipTests
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -88,7 +88,7 @@ jobs:
             echo "${{ secrets.ALIYUN_ACR_PASSWORD }}" | docker login --username="${{ secrets.ALIYUN_ACR_USERNAME }}" --password-stdin crpi-aer4k3m8uw2sue3f.cn-hangzhou.personal.cr.aliyuncs.com
 
             # 拉取最新镜像
-            docker pull crpi-aer4k3m8uw2sue3f.cn-hangzhou.personal.cr.aliyuncs.com/dzkdzk/listen:latest
+            docker pull crpi-aer4k3m8uw2sue3f.cn-hangzhou.personal.cr.aliyuncs.com/dzkdzk/listen-backend:latest
 
             # 升级 docker-compose 到最新版本（解决版本过旧问题）
             echo "检查并升级 docker-compose..."
