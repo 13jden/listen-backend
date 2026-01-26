@@ -23,8 +23,8 @@ COPY listen-common/src listen-common/src
 COPY listen-wx/src listen-wx/src
 COPY listen-admin/src listen-admin/src
 
-# 构建应用 - 修复：明确指定要构建的模块
-RUN mvn clean package -pl admin -am -DskipTests -B
+# 构建应用 - 使用正确的模块名称
+RUN mvn clean package -pl listen-admin -am -DskipTests -B
 
 # 运行阶段 - 使用更轻量的基础镜像
 FROM eclipse-temurin:17-jre-alpine
