@@ -36,13 +36,13 @@ WORKDIR /app
 ENV TZ=Asia/Shanghai
 
 # Alpine使用apk而不是apt-get
-RUN apk add --no-cache curl
+RUN apk add --no-cache curl ffmpeg
 
 # 设置环境变量
 ENV SPRING_PROFILES_ACTIVE=prod
 
 # 复制构建好的jar文件
-COPY --from=builder /app/listen-admin/target/admin-*.jar app.jar
+COPY --from=builder /app/listen-admin/target/listen-admin-*.jar app.jar
 
 # 暴露端口
 EXPOSE 8081

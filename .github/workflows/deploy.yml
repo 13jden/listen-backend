@@ -103,6 +103,10 @@ jobs:
             # 停止旧容器并启动新容器
             cd /opt/listen-bankend
 
+            # 创建必要的目录
+            mkdir -p /opt/listen-bankend/logs
+            mkdir -p /opt/listen-bankend/config
+
             # 优先使用 docker compose V2，如果不可用则使用升级后的 docker-compose
             if docker compose version &> /dev/null; then
               echo "使用 docker compose V2"
@@ -112,7 +116,7 @@ jobs:
             else
               echo "使用 docker-compose"
               docker-compose down || true
-              mkdir -p /opt/listen/files/diet
+              mkdir -p /opt/listen/files/audio
               docker-compose up -d
             fi
 
