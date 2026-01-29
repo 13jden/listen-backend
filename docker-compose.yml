@@ -11,6 +11,5 @@ services:
       - JAVA_OPTS=-Xms512m -Xmx1g -XX:+UseG1GC
     volumes:
       - ./logs:/app/logs
-      - ./config:/app/config
       # 挂载文件上传目录
       - /opt/listen/files:/opt/listen/files
