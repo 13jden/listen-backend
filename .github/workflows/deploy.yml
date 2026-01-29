@@ -87,7 +87,10 @@ jobs:
             # 登录阿里云容器镜像服务
             echo "${{ secrets.ALIYUN_ACR_PASSWORD }}" | docker login --username="${{ secrets.ALIYUN_ACR_USERNAME }}" --password-stdin crpi-aer4k3m8uw2sue3f.cn-hangzhou.personal.cr.aliyuncs.com
 
-            # 拉取最新镜像
+            # 删除旧镜像并强制拉取最新镜像
+            echo "删除旧镜像..."
+            docker rmi crpi-aer4k3m8uw2sue3f.cn-hangzhou.personal.cr.aliyuncs.com/dzkdzk/listen-backend:latest 2>/dev/null || true
+            echo "拉取最新镜像..."
             docker pull crpi-aer4k3m8uw2sue3f.cn-hangzhou.personal.cr.aliyuncs.com/dzkdzk/listen-backend:latest
 
             # 升级 docker-compose 到最新版本（解决版本过旧问题）
