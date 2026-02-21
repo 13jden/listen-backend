@@ -100,7 +100,7 @@ public class UsertestServiceImpl extends ServiceImpl<UsertestMapper, Usertest> i
             testdetailMapper.insertTestDetail(testdetail);
             //添加返回数据
             testDto.setId(testdetail.getId());
-            testDto.setTest_id(testId);
+            testDto.setTestId(testId);
             testDto.setAudioPath(getHttpAudio.getAudioUrl(audio.getPath()));
             testDto.setTestAudioPath(getHttpAudio.getAudioUrl(testdetail.getUserAudioPath()));
             testDtoList.add(testDto);
@@ -153,7 +153,7 @@ public class UsertestServiceImpl extends ServiceImpl<UsertestMapper, Usertest> i
         List<TestDto> testDtoList = new ArrayList<>();
         for(Testdetail testdetail:testdetailList){
             TestDto testDto =new TestDto();
-            testDto.setTest_id(testdetail.getTestId());
+            testDto.setTestId(testdetail.getTestId());
             Audio audio = audioMapper.selectById(testdetail.getAudioId());
             testDto.setAudioPath(getHttpAudio.getAudioUrl(audio.getPath()));
             testDto.setTestAudioPath(getHttpAudio.getAudioUrl(testdetail.getUserAudioPath()));

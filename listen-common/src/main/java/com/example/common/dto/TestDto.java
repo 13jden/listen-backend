@@ -1,10 +1,11 @@
 package com.example.common.dto;
 
-import com.baomidou.mybatisplus.annotation.IdType;
-import com.baomidou.mybatisplus.annotation.TableId;
+import lombok.Data;
 
 import java.util.Date;
 
+
+@Data
 public class TestDto {
 
     /**
@@ -50,75 +51,4 @@ public class TestDto {
 
     private String testText;
 
-    public String getUserText() {
-        return userText;
-    }
-
-    public void setUserText(String userText) {
-        this.userText = userText;
-    }
-
-    public String getTestText() {
-        return testText;
-    }
-
-    public void setTestText(String testText) {
-        this.testText = testText;
-    }
-
-    public String getTestId() {
-        return testId;
-    }
-
-    public void setTestId(String testId) {
-        this.testId = testId;
-    }
-
-    public int getIndex() {
-        return index;
-    }
-
-    public void setIndex(int index) {
-        this.index = index;
-    }
-
-    public String getTest_id() {
-        return testId;
-    }
-
-    public void setTest_id(String test_id) {
-        this.testId = test_id;
-    }
-
-    public String getTestAudioPath() {
-        return testAudioPath;
-    }
-
-    public void setTestAudioPath(String testAudioPath) {
-        this.testAudioPath = testAudioPath;
-    }
-
-    public int getScore() {
-        return Score;
-    }
-
-    public void setScore(int score) {
-        Score = score;
-    }
-
-    public Date getTestTime() {
-        return testTime;
-    }
-
-    public void setTestTime(Date testTime) {
-        this.testTime = testTime;
-    }
-
-    public String getAudioPath() {
-        return audioPath;
-    }
-
-    public void setAudioPath(String audioPath) {
-        this.audioPath = audioPath;
-    }
 }

@@ -1,6 +1,5 @@
 package com.example.common.common;
 import com.example.common.Enum.ResultEnum;
-import com.example.common.dto.TestDto;
 import lombok.Data;
 
 
@@ -9,7 +8,7 @@ import lombok.Data;
  */
 
 @Data
-public class Result<T> extends TestDto {
+public class Result<T> {
 
     // 操作代码
     Integer code;

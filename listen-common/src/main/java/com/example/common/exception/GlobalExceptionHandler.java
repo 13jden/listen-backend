@@ -57,4 +57,11 @@ public class GlobalExceptionHandler {
     public Result UserLoginException(UserLoginException ex) {
         return Result.error(ex.getMessage());
     }
+
+    @ExceptionHandler(BusinessException.class)
+    @ResponseStatus(HttpStatus.UNAUTHORIZED)
+    @ResponseBody
+    public Result BusinessException(BusinessException ex) {
+        return Result.error(ex.getMessage());
+    }
 }

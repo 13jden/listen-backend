@@ -1,6 +1,7 @@
 package com.example.wx.service;
 
 import com.baomidou.mybatisplus.extension.service.IService;
+import com.example.common.dto.TokenAdminDto;
 import com.example.wx.pojo.Admin;
 import org.springframework.stereotype.Service;
 
@@ -15,6 +16,6 @@ import org.springframework.stereotype.Service;
 @Service
 public interface AdminService extends IService<Admin> {
 
-    Admin login(String name, String password);
+    TokenAdminDto login(String name, String password);
 
 }

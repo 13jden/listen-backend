@@ -6,6 +6,7 @@ import com.example.common.common.ControllerTool;
 import com.example.common.common.Result;
 import com.example.common.constants.Constants;
 import com.example.common.dto.IndexDataVO;
+import com.example.common.dto.TokenAdminDto;
 import com.example.common.redis.RedisComponent;
 import com.example.common.utils.StringTools;
 import com.example.wx.mapper.UserMapper;
@@ -63,11 +64,7 @@ public class AdminController {
         redisComponent.cleanCheckCode(checkCodeKey);
         System.out.println(name);
         System.out.println(password);
-        Admin admin = adminService.login(name,password);
-
-        if(admin==null)
-            return Result.error("账号或密码错误");
-
+        TokenAdminDto admin = adminService.login(name,password);
         String token=null;
         //清上一条token
         if(request.getCookies()!=null){
@@ -78,10 +75,12 @@ public class AdminController {
             }
         }
 
-        if(!StringTools.isEmpty(token))
+        if(!StringTools.isEmpty(token)){
             redisComponent.cleanAdminToken(token);
+        }
         token = redisComponent.saveAdminTokenInfo(name);
         controllerTool.saveTokenAdminCookie(response,token);
+        admin.setToken(token);
         return Result.success(admin);
     }
 
