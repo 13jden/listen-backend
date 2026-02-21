@@ -7,6 +7,8 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
@@ -15,6 +17,12 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 public class SecurityConfig {
 
     private final RedisComponent redisComponent;
+
+    
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
+    }
 
     public SecurityConfig(RedisComponent redisComponent) {
         this.redisComponent = redisComponent;
@@ -32,6 +40,8 @@ public class SecurityConfig {
                         // ==================== 公开接口（无需登录） ====================
                         // 管理员登录
                         .requestMatchers("/admin/login").permitAll()
+                        //验证码
+                        .requestMatchers("/checkcode").permitAll()
                         // 小程序用户登录注册
                         .requestMatchers("/user/login", "/user/register").permitAll()
                         // 获取验证码

@@ -5,6 +5,7 @@ package com.example.admin.controller;
 import com.example.common.common.ControllerTool;
 import com.example.common.common.Result;
 import com.example.common.constants.Constants;
+import com.example.common.dto.AdminLoginDTO;
 import com.example.common.dto.IndexDataVO;
 import com.example.common.dto.TokenAdminDto;
 import com.example.common.redis.RedisComponent;
@@ -16,8 +17,9 @@ import com.example.wx.service.AdminService;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import jakarta.validation.constraints.NotEmpty;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -50,13 +52,15 @@ public class AdminController {
     private UsertestMapper usertestMapper;
 
 
-    @RequestMapping("/login")
+    @PostMapping("/login")
     public Result Login(HttpServletRequest request,
                         HttpServletResponse response,
-                        @RequestParam @NotEmpty String name,
-                        @RequestParam @NotEmpty String password,
-                        @RequestParam @NotEmpty String checkCodeKey,
-                        @RequestParam @NotEmpty String checkCode){
+                        @RequestBody AdminLoginDTO loginDTO){
+        String name = loginDTO.getName();
+        String password = loginDTO.getPassword();
+        String checkCodeKey = loginDTO.getCheckCodeKey();
+        String checkCode = loginDTO.getCheckCode();
+
         if(!checkCode.equalsIgnoreCase(redisComponent.getCheckCode(checkCodeKey))){
             return Result.error("验证码错误");
         }
