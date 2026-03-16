@@ -69,13 +69,25 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
 
         Usertest latestTest = usertestMapper.getLatestTestByUserId(user.getUserId());
         userInfoDto.setScore(latestTest != null ? latestTest.getAvgScore() : 0);
-        userInfoDto.setAvgScore(Integer.valueOf(String.valueOf(usertestMapper.getScoreByUserId(user.getUserId()))));
+        Double avgScoreResult = usertestMapper.getScoreByUserId(user.getUserId());
+        userInfoDto.setAvgScore(avgScoreResult != null ? avgScoreResult.intValue() : 0);
 
         return userInfoDto;
     }
 
     @Override
     public TokenUserInfoDto register(String openid, String name,int hospitalId, String number,String medicalId) {
+        // 校验 openid 格式
+        if (StringTools.isEmpty(openid) || openid.length() > 100 || openid.getBytes().length != openid.length()) {
+            throw new UserLoginException("openid 无效");
+        }
+
+        // 检查是否已注册
+        User existUser = userMapper.findByOpenId(openid);
+        if (existUser != null) {
+            throw new UserLoginException("用户已存在");
+        }
+
         User user = new User();
         user.setOpenId(openid);
         user.setUserId(StringTools.getRandomBumber(Constants.LENGTH_10));

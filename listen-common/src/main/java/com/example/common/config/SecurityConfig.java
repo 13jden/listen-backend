@@ -50,6 +50,8 @@ public class SecurityConfig {
                         .requestMatchers("/static/**", "/assets/**", "/css/**", "/js/**", "/images/**").permitAll()
                         // 允许所有 OPTIONS 请求（跨域预检）
                         .requestMatchers(org.springframework.http.HttpMethod.OPTIONS, "/**").permitAll()
+                        // 开发环境开放测试
+                        .requestMatchers("/**").permitAll()
                         // ==================== 其他请求需要认证 ====================
                         .anyRequest().authenticated()
                 )
