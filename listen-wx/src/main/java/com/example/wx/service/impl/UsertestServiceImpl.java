@@ -96,7 +96,7 @@ public class UsertestServiceImpl extends ServiceImpl<UsertestMapper, Usertest> i
             testdetail.setTestId(testId);
             testdetail.setAudioId(audio.getId());
             testdetail.setIndex(i);
-            testdetail.setScore(0);
+            testdetail.setScore((float) 0);
             testdetailMapper.insertTestDetail(testdetail);
             //添加返回数据
             testDto.setId(testdetail.getId());
@@ -135,7 +135,7 @@ public class UsertestServiceImpl extends ServiceImpl<UsertestMapper, Usertest> i
                     e.printStackTrace();
                 }
                 String testId = usertest.getId();
-                List<Testdetail> testdetailList = testdetailMapper.selectList(testId);
+                List<Testdetail> testdetailList = testdetailMapper.selectListByTestId(testId);
                 for(Testdetail t : testdetailList){
                     testdetailMapper.deleteById(t);
                 }
@@ -149,7 +149,7 @@ public class UsertestServiceImpl extends ServiceImpl<UsertestMapper, Usertest> i
         if(time==1){
             return Result.success(usertest);
         }
-        List<Testdetail> testdetailList = testdetailMapper.selectList(usertest.getId());
+        List<Testdetail> testdetailList = testdetailMapper.selectListByTestId(usertest.getId());
         List<TestDto> testDtoList = new ArrayList<>();
         for(Testdetail testdetail:testdetailList){
             TestDto testDto =new TestDto();
@@ -172,7 +172,7 @@ public class UsertestServiceImpl extends ServiceImpl<UsertestMapper, Usertest> i
         if(usertest==null||usertest.getAvgScore()!=0)
             throw new RuntimeException("提交错误");
         List<Testdetail> testdetailList = new ArrayList<>();
-        testdetailList = testdetailMapper.selectList(testId);
+        testdetailList = testdetailMapper.selectListByTestId(testId);
         int sum = 0;
         double avg = 0;
         int n=0;

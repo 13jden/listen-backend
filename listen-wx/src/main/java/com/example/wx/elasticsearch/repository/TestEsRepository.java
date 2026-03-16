@@ -1,6 +1,6 @@
-package com.example.common.elasticsearch.repository;
+package com.example.wx.elasticsearch.repository;
 
-import com.example.common.elasticsearch.entity.TestEs;
+import com.example.wx.elasticsearch.entity.TestEs;
 import org.springframework.data.elasticsearch.repository.ElasticsearchRepository;
 import org.springframework.stereotype.Repository;
 

@@ -130,7 +130,7 @@ public class TestdetailServiceImpl extends ServiceImpl<TestdetailMapper, Testdet
         System.out.println("识别文字是："+userContent+"正确的文字是："+audioContent);
         System.out.println("现在开始计算准确率");
         // 计算得分（基于 Levenshtein 距离）
-        int score = calculateScore(userContent, audioContent);
+        float score = calculateScore(userContent, audioContent);
         System.out.println("准确率为："+score);
         // 更新测试详情信息
         testdetail.setUserAudioPath(fullPath);
@@ -212,7 +212,7 @@ public class TestdetailServiceImpl extends ServiceImpl<TestdetailMapper, Testdet
         System.out.println("识别文字是："+userContent+"正确的文字是："+audioContent);
         System.out.println("现在开始计算准确率");
         // 计算得分（基于 Levenshtein 距离）
-        int score = calculateScore(userContent, audioContent);
+        float score = calculateScore(userContent, audioContent);
         System.out.println("准确率为："+score);
         // 更新测试详情信息
         return Result.success(score);
@@ -225,7 +225,7 @@ public class TestdetailServiceImpl extends ServiceImpl<TestdetailMapper, Testdet
      * @param audioContent  标准音频文本
      * @return 得分（百分比）
      */
-    private int calculateScore(String userContent, String audioContent) {
+    private float calculateScore(String userContent, String audioContent) {
         if (userContent == null || audioContent == null) {
             return 0;
         }

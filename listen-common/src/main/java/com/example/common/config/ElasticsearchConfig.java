@@ -10,7 +10,7 @@ import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 
 @Configuration
-@EnableElasticsearchRepositories(basePackages = "com.example.**.elasticsearch.repository")
+@EnableElasticsearchRepositories(basePackages = "com.example.wx.elasticsearch.repository")
 @Slf4j
 public class ElasticsearchConfig extends ElasticsearchConfiguration {
 

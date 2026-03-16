@@ -1,4 +1,4 @@
-package com.example.common.elasticsearch.entity;
+package com.example.wx.elasticsearch.entity;
 
 import lombok.Data;
 import org.springframework.data.annotation.Id;
@@ -14,7 +14,7 @@ import java.time.LocalDateTime;
  * 存储标准音频文件信息
  */
 @Data
-@Document(indexName = "audios")
+@Document(indexName = "audios", createIndex = false)
 public class AudioEs {
 
     @Id

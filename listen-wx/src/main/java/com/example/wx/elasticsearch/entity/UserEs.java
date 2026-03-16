@@ -1,4 +1,4 @@
-package com.example.common.elasticsearch.entity;
+package com.example.wx.elasticsearch.entity;
 
 import lombok.Data;
 import org.springframework.data.annotation.Id;
@@ -14,7 +14,7 @@ import java.time.LocalDate;
  * 基于MySQL的User表和用户设计文档创建
  */
 @Data
-@Document(indexName = "users")
+@Document(indexName = "users", createIndex = false)
 public class UserEs {
 
     @Id

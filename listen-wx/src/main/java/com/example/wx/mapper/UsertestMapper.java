@@ -64,6 +64,11 @@ public interface UsertestMapper extends BaseMapper<Usertest> {
     @Select("SELECT COUNT(*) FROM usertest")
     int getAllTimes();
 
+    /**
+     * 根据日期范围查询测试记录
+     */
+    @Select("SELECT * FROM usertest WHERE test_time >= #{startDate} AND test_time < #{endDate}")
+    List<Usertest> selectListByDate(Date startDate, Date endDate);
 
 
 }

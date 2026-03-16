@@ -36,7 +36,7 @@ public class TestDto {
     /**
      * 测试分数
      */
-    private int Score;
+    private Float Score;
 
     private Date testTime;
 

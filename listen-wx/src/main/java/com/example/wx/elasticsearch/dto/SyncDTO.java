@@ -1,4 +1,4 @@
-package com.example.common.elasticsearch.dto;
+package com.example.wx.elasticsearch.dto;
 
 import lombok.Data;
 

@@ -1,4 +1,4 @@
-package com.example.common.elasticsearch.entity;
+package com.example.wx.elasticsearch.entity;
 
 import lombok.Data;
 import org.springframework.data.annotation.Id;
@@ -14,7 +14,7 @@ import java.time.LocalDateTime;
  * 用于统计主力，支持多维度聚合分析
  */
 @Data
-@Document(indexName = "tests")
+@Document(indexName = "tests", createIndex = false)
 public class TestEs {
 
     @Id

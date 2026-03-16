@@ -1,4 +1,4 @@
-package com.example.common.elasticsearch.entity;
+package com.example.wx.elasticsearch.entity;
 
 import lombok.Data;
 import org.springframework.data.annotation.Id;
@@ -14,7 +14,7 @@ import java.time.LocalDateTime;
  * 用于错误分析、样本追溯
  */
 @Data
-@Document(indexName = "test_items")
+@Document(indexName = "test_items", createIndex = false)
 public class TestItemEs {
 
     @Id

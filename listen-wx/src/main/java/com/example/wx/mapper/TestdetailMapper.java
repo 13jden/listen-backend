@@ -7,6 +7,7 @@ import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
 
+import java.util.Date;
 import java.util.List;
 
 /**
@@ -29,7 +30,7 @@ public interface TestdetailMapper extends BaseMapper<Testdetail> {
     @Select("SELECT id, test_id, audio_id, user_audio_path, `index`, score, user_content, test_time " +
             "FROM testdetail WHERE test_id = #{testId} " +
             "ORDER BY `index` ASC")
-    List<Testdetail> selectList(String testId);
+    List<Testdetail> selectListByTestId(String testId);
 
     @Select("SELECT id, test_id, audio_id, user_audio_path, `index`, score, user_content, test_time " +
             "FROM testdetail WHERE id = #{testDetailId}")
@@ -43,4 +44,14 @@ public interface TestdetailMapper extends BaseMapper<Testdetail> {
     @Select("SELECT * FROM testdetail WHERE test_id = #{testId}"+
             "ORDER BY `index` ASC")
     List<Testdetail> selectByTestId(String testId);
+
+    /**
+     * 根据日期范围查询测试详情
+     */
+    @Select("SELECT id, test_id, audio_id, user_audio_path, `index`, score, user_content, test_time " +
+            "FROM testdetail WHERE test_time >= #{startDate} AND test_time < #{endDate}")
+    List<Testdetail> selectListByDate(Date startDate, Date endDate);
+
+    @Select("SELECT id, test_id, audio_id, user_audio_path, `index`, score, user_content, test_time FROM testdetail")
+    List<Testdetail> selectList();
 }

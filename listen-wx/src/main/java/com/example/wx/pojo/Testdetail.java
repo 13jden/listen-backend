@@ -44,7 +44,7 @@ public class Testdetail implements Serializable {
     /**
      * 用户得分
      */
-    private int score;
+    private Float score;
 
     /**
      * 用户音频（api返回内容）

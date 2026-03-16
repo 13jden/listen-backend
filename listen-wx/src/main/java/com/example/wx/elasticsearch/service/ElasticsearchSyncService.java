@@ -1,8 +1,8 @@
-package com.example.common.elasticsearch.service;
+package com.example.wx.elasticsearch.service;
 
-import com.example.common.elasticsearch.dto.SyncDTO;
-import com.example.common.elasticsearch.entity.*;
-import com.example.common.elasticsearch.repository.*;
+import com.example.wx.elasticsearch.dto.SyncDTO;
+import com.example.wx.elasticsearch.entity.*;
+import com.example.wx.elasticsearch.repository.*;
 import com.example.wx.mapper.AudioMapper;
 import com.example.wx.mapper.TestdetailMapper;
 import com.example.wx.mapper.UsertestMapper;
@@ -18,7 +18,6 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -194,7 +193,7 @@ public class ElasticsearchSyncService {
     @Transactional(readOnly = true)
     public void syncTestItems() {
         log.info("开始同步测试详情数据到ES");
-        List<Testdetail> details = testdetailMapper.selectList(null);
+        List<Testdetail> details = testdetailMapper.selectList();
         
         List<TestItemEs> testItemEsList = details.stream().map(this::convertToTestItemEs).collect(Collectors.toList());
         testItemEsRepository.saveAll(testItemEsList);
