@@ -231,6 +231,12 @@
             <artifactId>spring-boot-starter-data-elasticsearch</artifactId>
             <version>3.3.3</version>
         </dependency>
+        <dependency>
+            <groupId>com.example</groupId>
+            <artifactId>listen-wx</artifactId>
+            <version>0.0.1-SNAPSHOT</version>
+            <scope>compile</scope>
+        </dependency>
     </dependencies>
     <build>
         <plugins>
