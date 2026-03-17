@@ -52,6 +52,7 @@ jobs:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USERNAME }}
           password: ${{ secrets.SERVER_PASSWORD }}
+          timeout: 10m
           script: |
             # 创建部署目录
             mkdir -p /opt/listen-bankend
@@ -94,14 +95,15 @@ jobs:
             docker pull crpi-aer4k3m8uw2sue3f.cn-hangzhou.personal.cr.aliyuncs.com/dzkdzk/listen-backend:latest
 
             # 升级 docker-compose 到最新版本（解决版本过旧问题）
-            echo "检查并升级 docker-compose..."
-            COMPOSE_URL="https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)"
-            if sudo curl -L "$COMPOSE_URL" -o /usr/local/bin/docker-compose; then
-              sudo chmod +x /usr/local/bin/docker-compose
-              echo "docker-compose 升级成功: $(docker-compose --version 2>/dev/null || echo '版本未知')"
-            else
-              echo "docker-compose 升级失败，将尝试使用 docker compose V2"
-            fi
+            # 由于下载慢，暂时注释，每次部署都升级没必要
+            # echo "检查并升级 docker-compose..."
+            # COMPOSE_URL="https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)"
+            # if sudo curl -L --max-time 120 "$COMPOSE_URL" -o /usr/local/bin/docker-compose; then
+            #   sudo chmod +x /usr/local/bin/docker-compose
+            #   echo "docker-compose 升级成功: $(docker-compose --version 2>/dev/null || echo '版本未知')"
+            # else
+            #   echo "docker-compose 升级失败，将尝试使用 docker compose V2"
+            # fi
 
             # 停止旧容器并启动新容器
             cd /opt/listen-bankend
