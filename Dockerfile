@@ -15,15 +15,12 @@ COPY listen-common/pom.xml listen-common/
 COPY listen-wx/pom.xml listen-wx/
 COPY listen-admin/pom.xml listen-admin/
 
-# 下载依赖（先下载依赖以利用 Docker 缓存）
-RUN mvn dependency:go-offline -B
-
-# 复制源代码
+# 复制源代码（先不复制，等依赖下载完再复制源码）
 COPY listen-common/src listen-common/src
 COPY listen-wx/src listen-wx/src
 COPY listen-admin/src listen-admin/src
 
-# 构建应用 - 使用正确的模块名称
+# 构建应用 - Maven 会自动下载所需依赖
 RUN mvn clean package -pl listen-admin -am -DskipTests -B
 
 # 运行阶段 - 使用更轻量的基础镜像
