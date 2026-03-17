@@ -1,6 +1,5 @@
 package com.example.wx.elasticsearch.service;
 
-import com.example.wx.elasticsearch.dto.SyncDTO;
 import com.example.wx.elasticsearch.entity.*;
 import com.example.wx.elasticsearch.repository.*;
 import com.example.wx.mapper.AudioMapper;
@@ -22,13 +21,16 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
-import java.util.stream.Collectors;
 
 /**
  * ES数据同步服务
  * 负责将MySQL数据同步到ES
+ * 核心功能：
+ * 1. 单次测试完成后实时同步到ES
+ * 2. 定时增量同步（按日期）
  */
 @Slf4j
 @Service
@@ -40,10 +42,8 @@ public class ElasticsearchSyncService {
     private final TestdetailMapper testdetailMapper;
     private final AudioMapper audioMapper;
 
-    private final UserEsRepository userEsRepository;
     private final TestEsRepository testEsRepository;
     private final TestItemEsRepository testItemEsRepository;
-    private final AudioEsRepository audioEsRepository;
 
     /**
      * 每天凌晨2点执行增量同步（按日期）
@@ -62,203 +62,103 @@ public class ElasticsearchSyncService {
     @Transactional(readOnly = true)
     public void syncByDate(String dateStr) {
         log.info("开始同步日期 {} 的数据", dateStr);
-        
+
         try {
             Date startDate = java.sql.Date.valueOf(LocalDate.parse(dateStr));
             Date endDate = java.sql.Date.valueOf(LocalDate.parse(dateStr).plusDays(1));
-            
-            // 同步该日期的测试数据
+
+            // 同步该日期的测试数据（包含汇总和详情）
             List<Usertest> tests = usertestMapper.selectListByDate(startDate, endDate);
-            List<TestEs> testEsList = tests.stream().map(this::convertToTestEs).collect(Collectors.toList());
-            testEsRepository.saveAll(testEsList);
-            log.info("日期 {} 测试数据同步完成，共同步 {} 条", dateStr, testEsList.size());
-            
-            // 同步该日期的测试详情
-            List<Testdetail> details = testdetailMapper.selectListByDate(startDate, endDate);
-            List<TestItemEs> testItemEsList = details.stream().map(this::convertToTestItemEs).collect(Collectors.toList());
-            testItemEsRepository.saveAll(testItemEsList);
-            log.info("日期 {} 测试详情同步完成，共同步 {} 条", dateStr, testItemEsList.size());
-            
+            for (Usertest usertest : tests) {
+                syncTestToEs(usertest.getId());
+            }
+            log.info("日期 {} 测试数据同步完成，共同步 {} 条", dateStr, tests.size());
+
         } catch (Exception e) {
             log.error("日期 {} 数据同步失败: {}", dateStr, e.getMessage(), e);
         }
     }
 
     /**
-     * 根据TestDto同步单条测试详情到ES
-     * 用于测试完成后实时同步
+     * 单次测试完成后同步到ES
+     * 同步测试汇总数据和所有测试详情
+     *
+     * @param testId 测试ID
      */
-    public void syncTestItem(TestDto testDto) {
-        log.info("根据DTO同步测试详情: {}", testDto.getId());
+    public void syncTestToEs(String testId) {
+        log.info("开始同步测试 {} 到ES", testId);
         try {
-            TestItemEs testItemEs = convertDtoToTestItemEs(testDto);
-            testItemEsRepository.save(testItemEs);
-            log.info("测试详情 {} 同步成功", testItemEs.getId());
+            // 查询测试数据
+            Usertest usertest = usertestMapper.selectById(testId);
+            if (usertest == null) {
+                log.warn("测试 {} 不存在，跳过同步", testId);
+                return;
+            }
+
+            // 查询关联的用户信息
+            User user = userMapper.selectById(usertest.getUserId());
+
+            // 转换并保存测试汇总数据
+            TestEs testEs = convertToTestEs(usertest, user);
+            testEsRepository.save(testEs);
+
+            // 查询测试详情并同步
+            List<Testdetail> details = testdetailMapper.selectListByTestId(testId);
+            for (Testdetail detail : details) {
+                TestItemEs itemEs = convertToTestItemEs(detail);
+                testItemEsRepository.save(itemEs);
+            }
+
+            log.info("测试 {} 同步完成，包含 {} 条详情", testId, details.size());
+        } catch (Exception e) {
+            log.error("测试 {} 同步失败: {}", testId, e.getMessage(), e);
+        }
+    }
+
+    /**
+     * 单条语音上传后同步到ES
+     *
+     * @param testDto 测试DTO
+     */
+    public void syncTestItemToEs(TestDto testDto) {
+        log.info("同步单条测试详情到ES: {}", testDto.getId());
+        try {
+            TestItemEs itemEs = convertDtoToTestItemEs(testDto);
+            testItemEsRepository.save(itemEs);
+            log.info("测试详情 {} 同步成功", testDto.getId());
         } catch (Exception e) {
             log.error("测试详情 {} 同步失败: {}", testDto.getId(), e.getMessage(), e);
         }
     }
 
     /**
-     * 全量同步所有数据
+     * Usertest + User -> TestEs 转换
      */
-    @Transactional(readOnly = true)
-    public void syncAll() {
-        log.info("开始全量同步");
-        
-        syncUsers();
-        syncTests();
-        syncTestItems();
-        syncAudios();
-        
-        log.info("全量数据同步完成");
-    }
-
-    /**
-     * 根据DTO同步指定数据
-     */
-    @Transactional(readOnly = true)
-    public void syncByDTO(SyncDTO dto) {
-        log.info("开始根据DTO同步: {}", dto);
-        
-        if (dto.getSyncUsers() != null && dto.getSyncUsers()) {
-            syncUsers();
-        }
-        if (dto.getSyncTests() != null && dto.getSyncTests()) {
-            if (dto.getStartDate() != null && dto.getEndDate() != null) {
-                syncTestsByDateRange(dto.getStartDate(), dto.getEndDate());
-            } else {
-                syncTests();
-            }
-        }
-        if (dto.getSyncTestItems() != null && dto.getSyncTestItems()) {
-            if (dto.getStartDate() != null && dto.getEndDate() != null) {
-                syncTestItemsByDateRange(dto.getStartDate(), dto.getEndDate());
-            } else {
-                syncTestItems();
-            }
-        }
-        if (dto.getSyncAudios() != null && dto.getSyncAudios()) {
-            syncAudios();
-        }
-        
-        log.info("DTO同步完成");
-    }
-
-    /**
-     * 同步用户数据到ES
-     */
-    @Transactional(readOnly = true)
-    public void syncUsers() {
-        log.info("开始同步用户数据到ES");
-        List<User> users = userMapper.selectList(null);
-        
-        List<UserEs> userEsList = users.stream().map(this::convertToUserEs).collect(Collectors.toList());
-        userEsRepository.saveAll(userEsList);
-        
-        log.info("用户数据同步完成，共同步 {} 条", userEsList.size());
-    }
-
-    /**
-     * 同步测试数据到ES
-     */
-    @Transactional(readOnly = true)
-    public void syncTests() {
-        log.info("开始同步测试数据到ES");
-        List<Usertest> tests = usertestMapper.selectList(null);
-        
-        List<TestEs> testEsList = tests.stream().map(this::convertToTestEs).collect(Collectors.toList());
-        testEsRepository.saveAll(testEsList);
-        
-        log.info("测试数据同步完成，共同步 {} 条", testEsList.size());
-    }
-
-    /**
-     * 按日期范围同步测试数据
-     */
-    @Transactional(readOnly = true)
-    public void syncTestsByDateRange(Date startDate, Date endDate) {
-        log.info("开始同步日期范围的测试数据: {} - {}", startDate, endDate);
-        List<Usertest> tests = usertestMapper.selectListByDate(startDate, endDate);
-        
-        List<TestEs> testEsList = tests.stream().map(this::convertToTestEs).collect(Collectors.toList());
-        testEsRepository.saveAll(testEsList);
-        
-        log.info("测试数据同步完成，共同步 {} 条", testEsList.size());
-    }
-
-    /**
-     * 同步测试详情数据到ES
-     */
-    @Transactional(readOnly = true)
-    public void syncTestItems() {
-        log.info("开始同步测试详情数据到ES");
-        List<Testdetail> details = testdetailMapper.selectList();
-        
-        List<TestItemEs> testItemEsList = details.stream().map(this::convertToTestItemEs).collect(Collectors.toList());
-        testItemEsRepository.saveAll(testItemEsList);
-        
-        log.info("测试详情数据同步完成，共同步 {} 条", testItemEsList.size());
-    }
-
-    /**
-     * 按日期范围同步测试详情数据
-     */
-    @Transactional(readOnly = true)
-    public void syncTestItemsByDateRange(Date startDate, Date endDate) {
-        log.info("开始同步日期范围的测试详情数据: {} - {}", startDate, endDate);
-        List<Testdetail> details = testdetailMapper.selectListByDate(startDate, endDate);
-        
-        List<TestItemEs> testItemEsList = details.stream().map(this::convertToTestItemEs).collect(Collectors.toList());
-        testItemEsRepository.saveAll(testItemEsList);
-        
-        log.info("测试详情数据同步完成，共同步 {} 条", testItemEsList.size());
-    }
-
-    /**
-     * 同步音频数据到ES
-     */
-    @Transactional(readOnly = true)
-    public void syncAudios() {
-        log.info("开始同步音频数据到ES");
-        List<Audio> audios = audioMapper.selectList(null);
-        
-        List<AudioEs> audioEsList = audios.stream().map(this::convertToAudioEs).collect(Collectors.toList());
-        audioEsRepository.saveAll(audioEsList);
-        
-        log.info("音频数据同步完成，共同步 {} 条", audioEsList.size());
-    }
-
-    /**
-     * User -> UserEs 转换
-     */
-    private UserEs convertToUserEs(User user) {
-        UserEs userEs = new UserEs();
-        userEs.setUserId(user.getUserId());
-        userEs.setOpenid(user.getOpenId());
-        userEs.setMedicalId(user.getMedicalId());
-        userEs.setPhone(user.getNumber());
-
-        if (user.getHospitalId() != null) {
-            userEs.setHospitalId(String.valueOf(user.getHospitalId()));
-        }
-
-        if (user.getRegisterTime() != null) {
-            userEs.setCreatedAt(user.getRegisterTime().toInstant().atZone(ZoneId.systemDefault()).toLocalDate());
-        }
-
-        userEs.setStatus("active");
-        return userEs;
-    }
-
-    /**
-     * Usertest -> TestEs 转换
-     */
-    private TestEs convertToTestEs(Usertest usertest) {
+    private TestEs convertToTestEs(Usertest usertest, User user) {
         TestEs testEs = new TestEs();
         testEs.setTestId(usertest.getId());
         testEs.setUserId(usertest.getUserId());
         testEs.setTotalScore(usertest.getAvgScore());
+        testEs.setResultAnalysis(usertest.getResultAnalysis());
+        testEs.setPassFlag(usertest.getAvgScore() >= 60);
+
+        // 设置用户基础信息
+        if (user != null) {
+            testEs.setMedicalId(user.getMedicalId());
+            // User表暂无age和sex字段，如有需要可后续扩展
+            // testEs.setAge(user.getAge());
+            // testEs.setSex(user.getSex());
+            if (user.getHospitalId() != null) {
+                testEs.setHospitalId(String.valueOf(user.getHospitalId()));
+            }
+            // User表暂无hospitalName字段，如有需要可后续扩展
+        }
+
+        // 获取该测试的所有详情，计算总题目数量
+        List<Testdetail> details = testdetailMapper.selectListByTestId(usertest.getId());
+        if (details != null && !details.isEmpty()) {
+            testEs.setTotalItems(details.size());
+        }
 
         if (usertest.getTestTime() != null) {
             LocalDateTime testDateTime = usertest.getTestTime().toInstant().atZone(ZoneId.systemDefault()).toLocalDateTime();
@@ -295,8 +195,26 @@ public class ElasticsearchSyncService {
         itemEs.setFinalScore(detail.getScore() != null ? detail.getScore().floatValue() : null);
         itemEs.setIsCorrect(detail.getScore() != null && detail.getScore() >= 60);
 
+        // 设置错误信息
+        if (detail.getErrorTags() != null && !detail.getErrorTags().isEmpty()) {
+            itemEs.setErrorTags(detail.getErrorTags().split(","));
+        }
+        itemEs.setErrorDetail(detail.getErrorPositions());
+        itemEs.setResultAnalysis(detail.getResultAnalysis());
+
+        // 设置时长信息
+        itemEs.setSpeechDurationSec(detail.getSpeechDurationSec());
+        itemEs.setStandardDurationSec(detail.getStandardDurationSec());
+        itemEs.setDurationScore(detail.getDurationScore());
+
         if (detail.getTestTime() != null) {
             itemEs.setCreatedAt(detail.getTestTime().toInstant().atZone(ZoneId.systemDefault()).toLocalDateTime());
+        }
+
+        // 查询标准音频文本
+        Audio audio = audioMapper.selectById(detail.getAudioId());
+        if (audio != null) {
+            itemEs.setStandardText(audio.getContent());
         }
 
         return itemEs;
@@ -304,7 +222,6 @@ public class ElasticsearchSyncService {
 
     /**
      * TestDto -> TestItemEs 转换
-     * 用于业务层测试完成后实时同步
      */
     private TestItemEs convertDtoToTestItemEs(TestDto dto) {
         TestItemEs itemEs = new TestItemEs();
@@ -312,8 +229,26 @@ public class ElasticsearchSyncService {
         itemEs.setTestId(dto.getTestId());
         itemEs.setItemIndex(dto.getIndex());
         itemEs.setUserAsrText(dto.getUserText());
-        itemEs.setFinalScore((float) dto.getScore());
+        itemEs.setStandardText(dto.getTestText());
+        itemEs.setFinalScore(dto.getScore());
         itemEs.setIsCorrect(dto.getScore() >= 60);
+
+        // 设置错误信息
+        if (dto.getErrorTags() != null && !dto.getErrorTags().isEmpty()) {
+            itemEs.setErrorTags(dto.getErrorTags().split(","));
+        }
+        itemEs.setErrorDetail(dto.getErrorPositions());
+        itemEs.setResultAnalysis(dto.getResultAnalysis());
+
+        // 设置时长信息
+        itemEs.setSpeechDurationSec(dto.getSpeechDurationSec());
+        itemEs.setStandardDurationSec(dto.getStandardDurationSec());
+        itemEs.setDurationScore(dto.getDurationScore());
+
+        // 设置评分相关信息
+        // editDistanceScore 和 textSimilarity 可以通过计算得出，这里暂未存储
+        // llmScore 对应 aiScore
+        itemEs.setLlmScore(dto.getAiScore());
 
         if (dto.getTestTime() != null) {
             itemEs.setCreatedAt(dto.getTestTime().toInstant().atZone(ZoneId.systemDefault()).toLocalDateTime());
@@ -323,48 +258,9 @@ public class ElasticsearchSyncService {
     }
 
     /**
-     * Audio -> AudioEs 转换
-     */
-    private AudioEs convertToAudioEs(Audio audio) {
-        AudioEs audioEs = new AudioEs();
-        audioEs.setAudioId(audio.getId());
-        audioEs.setContent(audio.getContent());
-        audioEs.setPath(audio.getPath());
-        audioEs.setUploadAdmin(audio.getAdminId());
-
-        if (audio.getUploadTime() != null) {
-            audioEs.setUploadTime(audio.getUploadTime().toInstant().atZone(ZoneId.systemDefault()).toLocalDateTime());
-        }
-
-        audioEs.setStatus("active");
-        return audioEs;
-    }
-
-    /**
-     * 根据用户ID查询ES中的用户
-     */
-    public UserEs findUserById(String userId) {
-        return userEsRepository.findById(userId).orElse(null);
-    }
-
-    /**
      * 根据测试ID查询ES中的测试
      */
     public TestEs findTestById(String testId) {
         return testEsRepository.findById(testId).orElse(null);
-    }
-
-    /**
-     * 删除ES中的用户
-     */
-    public void deleteUser(String userId) {
-        userEsRepository.deleteById(userId);
-    }
-
-    /**
-     * 删除ES中的测试
-     */
-    public void deleteTest(String testId) {
-        testEsRepository.deleteById(testId);
     }
 }

@@ -9,6 +9,7 @@ import com.example.common.constants.Constants;
 import com.example.common.dto.TestDto;
 import com.example.common.dto.UserTestDto;
 import com.example.common.utils.StringTools;
+import com.example.wx.elasticsearch.service.ElasticsearchSyncService;
 import com.example.wx.mapper.AudioMapper;
 import com.example.wx.mapper.TestdetailMapper;
 import com.example.wx.mapper.UserMapper;
@@ -55,6 +56,9 @@ public class UsertestServiceImpl extends ServiceImpl<UsertestMapper, Usertest> i
 
     @Autowired
     private UserMapper userMapper;
+
+    @Autowired
+    private ElasticsearchSyncService elasticsearchSyncService;
 
     @Value("${userFile.path}")
     private String userPath;
@@ -176,18 +180,89 @@ public class UsertestServiceImpl extends ServiceImpl<UsertestMapper, Usertest> i
         int sum = 0;
         double avg = 0;
         int n=0;
+
+        // 收集错误信息
+        StringBuilder errorAudioIdsBuilder = new StringBuilder();
+        List<String> allErrorTags = new ArrayList<>();
+
         for(Testdetail testdetail : testdetailList){
             sum+=testdetail.getScore();
             n++;
+
+            // 收集错误音频ID和错误标签（得分 < 60 为错误）
+            if (testdetail.getScore() != null && testdetail.getScore() < 60) {
+                if (errorAudioIdsBuilder.length() > 0) {
+                    errorAudioIdsBuilder.append(",");
+                }
+                errorAudioIdsBuilder.append(testdetail.getAudioId());
+
+                // 收集错误标签
+                if (testdetail.getErrorTags() != null && !testdetail.getErrorTags().isEmpty()) {
+                    String[] tags = testdetail.getErrorTags().split(",");
+                    for (String tag : tags) {
+                        if (!allErrorTags.contains(tag)) {
+                            allErrorTags.add(tag);
+                        }
+                    }
+                }
+            }
         }
         avg =  sum/n;
+
+        // 生成总体结果分析
+        String errorTagsStr = String.join(",", allErrorTags);
+        String resultAnalysis = generateReport(avg, errorTagsStr, n);
+
         usertest.setEndTime(new Date());
         BigDecimal avgBigDecimal = new BigDecimal(avg).setScale(2, RoundingMode.HALF_UP);
         usertest.setAvgScore(avgBigDecimal.doubleValue());
         usertest.setEndTime(new Date());
         usertest.setNum(n);
+        usertest.setResultAnalysis(resultAnalysis);
         usertestMapper.updateById(usertest);
+
+        // 同步到ES
+        elasticsearchSyncService.syncTestToEs(testId);
+
         return usertest;
+    }
+
+    /**
+     * 生成测试报告
+     */
+    private String generateReport(double avgScore, String errorTags, int itemCount) {
+        StringBuilder report = new StringBuilder();
+
+        // 总体得分评价
+        if (avgScore >= 90) {
+            report.append("优秀！您的发音非常标准清晰，听感舒适。");
+        } else if (avgScore >= 80) {
+            report.append("良好，您的发音整体准确，偶有轻微瑕疵。");
+        } else if (avgScore >= 70) {
+            report.append("中等水平，存在一些发音问题需要改进。");
+        } else if (avgScore >= 60) {
+            report.append("及格，但发音存在明显问题，需要加强练习。");
+        } else {
+            report.append("不及格，发音问题较多，建议从基础开始系统练习。");
+        }
+
+        // 添加错误分析
+        if (errorTags != null && !errorTags.isEmpty()) {
+            report.append("本次测试共").append(itemCount).append("题，错误主要集中在：");
+            String[] tags = errorTags.split(",");
+            for (int i = 0; i < tags.length; i++) {
+                report.append(tags[i]);
+                if (i < tags.length - 1) {
+                    report.append("、");
+                }
+            }
+            report.append("方面。建议针对这些问题进行专项练习。");
+        }
+
+        // 添加练习建议
+        report.append("坚持每天练习，注意听标准音频并跟读对比，逐步改善发音。");
+
+        return report.toString();
     }
 
     @Override

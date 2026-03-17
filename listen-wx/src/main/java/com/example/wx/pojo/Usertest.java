@@ -47,5 +47,10 @@ public class Usertest implements Serializable {
      */
     private Integer num;
 
+    /**
+     * 结果分析（总体评估和建议）
+     */
+    private String resultAnalysis;
+
 
 }

@@ -34,5 +34,10 @@ public class Audio implements Serializable {
 
     private Date uploadTime;
 
+    /**
+     * 标准音频时长（秒）
+     */
+    private Float durationSec;
+
 
 }
