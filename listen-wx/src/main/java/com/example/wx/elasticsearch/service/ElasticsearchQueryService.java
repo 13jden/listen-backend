@@ -1,24 +1,35 @@
 package com.example.wx.elasticsearch.service;
 
-import co.elastic.clients.elasticsearch.ElasticsearchClient;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.elasticsearch.action.search.SearchRequest;
+import org.elasticsearch.action.search.SearchResponse;
+import org.elasticsearch.client.RequestOptions;
+import org.elasticsearch.client.RestHighLevelClient;
+import org.elasticsearch.index.query.QueryBuilders;
+import org.elasticsearch.search.SearchHit;
+import org.elasticsearch.search.builder.SearchSourceBuilder;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
 /**
  * ES统计查询服务
  * 用于支持前端图表数据查询
- * 暂时先创建类，使用时再完善具体逻辑
  */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class ElasticsearchQueryService {
 
-    private final ElasticsearchClient elasticsearchClient;
+    @Autowired
+    private RestHighLevelClient restHighLevelClient;
+
+    static final String TEST_INDEX = "tests";
+    static final String TEST_ITEM_INDEX = "test_items";
 
     /**
      * 获取顶部4个卡片数据

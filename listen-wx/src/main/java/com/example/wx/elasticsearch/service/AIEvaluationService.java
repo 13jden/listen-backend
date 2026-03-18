@@ -157,6 +157,8 @@ public class AIEvaluationService {
 
             JsonObject bizParamJson = buildBizParams(bizParams);
 
+            log.info("AI评分请求参数 - userText: {}, standardText: {}", userContent, audioContent);
+
             ApplicationParam param = ApplicationParam.builder()
                     .apiKey(apiKey)
                     .appId(appId)
@@ -218,12 +220,16 @@ public class AIEvaluationService {
      */
     private String extractResult(ApplicationResult result) {
         if (result == null || result.getOutput() == null) {
+            log.warn("AI返回结果为空");
             return null;
         }
         ApplicationOutput output = result.getOutput();
         if (output.getText() != null && !output.getText().isEmpty()) {
-            return output.getText();
+            String aiText = output.getText();
+            log.info("AI返回文本: {}", aiText);
+            return aiText;
         }
+        log.warn("AI返回的text为空");
         return null;
     }
 

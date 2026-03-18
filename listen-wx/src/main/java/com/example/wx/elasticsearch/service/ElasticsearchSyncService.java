@@ -1,7 +1,6 @@
 package com.example.wx.elasticsearch.service;
 
 import com.example.wx.elasticsearch.entity.*;
-import com.example.wx.elasticsearch.repository.*;
 import com.example.wx.mapper.AudioMapper;
 import com.example.wx.mapper.TestdetailMapper;
 import com.example.wx.mapper.UsertestMapper;
@@ -11,12 +10,18 @@ import com.example.wx.pojo.Testdetail;
 import com.example.wx.pojo.Usertest;
 import com.example.wx.pojo.User;
 import com.example.common.dto.TestDto;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.elasticsearch.action.index.IndexRequest;
+import org.elasticsearch.action.index.IndexResponse;
+import org.elasticsearch.client.RequestOptions;
+import org.elasticsearch.client.RestHighLevelClient;
+import org.elasticsearch.common.xcontent.XContentType;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.io.IOException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -24,6 +29,8 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
  * ES数据同步服务
@@ -34,7 +41,6 @@ import java.util.List;
  */
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class ElasticsearchSyncService {
 
     private final UserMapper userMapper;
@@ -42,8 +48,28 @@ public class ElasticsearchSyncService {
     private final TestdetailMapper testdetailMapper;
     private final AudioMapper audioMapper;
 
-    private final TestEsRepository testEsRepository;
-    private final TestItemEsRepository testItemEsRepository;
+    @Autowired
+    private RestHighLevelClient restHighLevelClient;
+
+    private final ObjectMapper objectMapper;
+
+    static final String TEST_INDEX = "tests";
+    static final String TEST_ITEM_INDEX = "test_items";
+
+    @Autowired
+    public ElasticsearchSyncService(ObjectMapper objectMapper,
+                                     UserMapper userMapper,
+                                     UsertestMapper usertestMapper,
+                                     TestdetailMapper testdetailMapper,
+                                     AudioMapper audioMapper) {
+        this.objectMapper = objectMapper;
+        this.userMapper = userMapper;
+        this.usertestMapper = usertestMapper;
+        this.testdetailMapper = testdetailMapper;
+        this.audioMapper = audioMapper;
+        // 注册 Java 8 日期时间模块
+        this.objectMapper.registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule());
+    }
 
     /**
      * 每天凌晨2点执行增量同步（按日期）
@@ -100,19 +126,32 @@ public class ElasticsearchSyncService {
 
             // 转换并保存测试汇总数据
             TestEs testEs = convertToTestEs(usertest, user);
-            testEsRepository.save(testEs);
+            saveToEs(TEST_INDEX, testEs.getTestId(), testEs);
 
             // 查询测试详情并同步
             List<Testdetail> details = testdetailMapper.selectListByTestId(testId);
             for (Testdetail detail : details) {
                 TestItemEs itemEs = convertToTestItemEs(detail);
-                testItemEsRepository.save(itemEs);
+                saveToEs(TEST_ITEM_INDEX, itemEs.getId(), itemEs);
             }
 
             log.info("测试 {} 同步完成，包含 {} 条详情", testId, details.size());
         } catch (Exception e) {
             log.error("测试 {} 同步失败: {}", testId, e.getMessage(), e);
         }
+    }
+
+    /**
+     * 保存文档到ES
+     */
+    private void saveToEs(String index, String id, Object document) throws IOException {
+        IndexRequest request = new IndexRequest(index);
+        request.id(id);
+        String json = objectMapper.writeValueAsString(document);
+        request.source(json, XContentType.JSON);
+
+        IndexResponse response = restHighLevelClient.index(request, RequestOptions.DEFAULT);
+        log.debug("ES索引 {} 文档 {}, 状态: {}", index, id, response.status());
     }
 
     /**
@@ -124,7 +163,7 @@ public class ElasticsearchSyncService {
         log.info("同步单条测试详情到ES: {}", testDto.getId());
         try {
             TestItemEs itemEs = convertDtoToTestItemEs(testDto);
-            testItemEsRepository.save(itemEs);
+            saveToEs(TEST_ITEM_INDEX, itemEs.getId(), itemEs);
             log.info("测试详情 {} 同步成功", testDto.getId());
         } catch (Exception e) {
             log.error("测试详情 {} 同步失败: {}", testDto.getId(), e.getMessage(), e);
@@ -255,12 +294,5 @@ public class ElasticsearchSyncService {
         }
 
         return itemEs;
-    }
-
-    /**
-     * 根据测试ID查询ES中的测试
-     */
-    public TestEs findTestById(String testId) {
-        return testEsRepository.findById(testId).orElse(null);
     }
 }

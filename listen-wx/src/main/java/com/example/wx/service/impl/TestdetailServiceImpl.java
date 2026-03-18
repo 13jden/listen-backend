@@ -27,6 +27,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+import javax.sound.sampled.*;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
@@ -78,33 +79,21 @@ public class TestdetailServiceImpl extends ServiceImpl<TestdetailMapper, Testdet
      * 获取音频时长（秒）
      */
     private float getAudioDuration(String filePath) throws IOException {
-        String command = ffmpegPath + " -i " + filePath + " 2>&1";
-        Process process = Runtime.getRuntime().exec(command);
-        BufferedReader reader = new BufferedReader(new InputStreamReader(process.getErrorStream()));
-        String line;
-        float duration = 0;
         try {
-            while ((line = reader.readLine()) != null) {
-                if (line.contains("Duration:")) {
-                    // 解析 Duration: 00:00:02.50 格式
-                    String durationStr = line.substring(line.indexOf("Duration:") + 9, line.indexOf("Duration:") + 21);
-                    String[] parts = durationStr.split(":");
-                    if (parts.length == 3) {
-                        int hours = Integer.parseInt(parts[0]);
-                        int minutes = Integer.parseInt(parts[1]);
-                        float seconds = Float.parseFloat(parts[2]);
-                        duration = hours * 3600 + minutes * 60 + seconds;
-                    }
-                    break;
-                }
-            }
-            process.waitFor();
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        } finally {
-            reader.close();
+            // 使用 Java 标准库获取 WAV 文件时长
+            File wavFile = new File(filePath);
+            AudioInputStream audioInputStream = AudioSystem.getAudioInputStream(wavFile);
+            AudioFormat format = audioInputStream.getFormat();
+            long frames = audioInputStream.getFrameLength();
+            float frameRate = format.getFrameRate();
+            double durationInSeconds = frames / frameRate;
+            audioInputStream.close();
+            System.out.println("音频时长: " + durationInSeconds + " 秒");
+            return (float) durationInSeconds;
+        } catch (Exception e) {
+            System.out.println("获取时长失败: " + e.getMessage());
+            return 0;
         }
-        return duration;
     }
 
     /**
@@ -172,6 +161,12 @@ public class TestdetailServiceImpl extends ServiceImpl<TestdetailMapper, Testdet
         String audioContent = audio.getContent(); // 标准音频文本
         System.out.println("识别文字是："+userContent+"正确的文字是："+audioContent);
 
+        // 标记识别是否为空
+        boolean isEmptyRecognition = (userContent == null || userContent.trim().isEmpty()||userContent.equals(""));
+        if (isEmptyRecognition) {
+            log.warn("语音识别结果为空");
+        }
+
         // 获取用户语音时长
         float userDuration = getAudioDuration(fullPath);
         System.out.println("用户语音时长: " + userDuration + "秒");
@@ -191,49 +186,57 @@ public class TestdetailServiceImpl extends ServiceImpl<TestdetailMapper, Testdet
         }
 
         // 计算各部分得分
-        float durationScore = calculateDurationScore(userDuration, standardDuration);
-        float editDistanceScore = calculateEditDistanceScore(userContent, audioContent);
-
-        // 使用AI评分（如果有），否则使用编辑距离评分
-        float aiScore;
-        if (aiResult != null && aiResult.getScore() > 0) {
-            aiScore = aiResult.getScore();
-        } else {
-            aiScore = editDistanceScore;
-        }
-
-        // 计算最终得分：时长0.2 + 编辑距离0.5 + AI评分0.3
-        float score = durationScore * 0.2f + editDistanceScore * 0.5f + aiScore * 0.3f;
-        System.out.println("最终得分为：" + score);
-
-        // 获取错误标签和错误详情
+        float durationScore = 0;
+        float editDistanceScore = 0;
+        float aiScore = 0;
+        float score = 0;
         String errorPositions = "";
         String errorTags = "";
+        String resultAnalysis = "";
+        String userText = "";
+        String audioText = "";
+        float similarity = 100f;
 
-        // 去除非中文字符进行位置分析
-        String userText = userContent.replaceAll("[^\\u4e00-\\u9fa5a-zA-Z0-9]", "");
-        String audioText = audioContent.replaceAll("[^\\u4e00-\\u9fa5a-zA-Z0-9]", "");
-        float similarity = calculateEditDistanceScore(userContent, audioContent);
+        if (!isEmptyRecognition) {
+            // 计算各部分得分
+            durationScore = calculateDurationScore(userDuration, standardDuration);
+            editDistanceScore = calculateEditDistanceScore(userContent, audioContent);
 
-        if (similarity < 100f) {
-            // 计算错误位置
-            errorPositions = calculateErrorPositions(userText, audioText);
-
-            // 使用AI返回的错误标签
-            if (aiResult != null && aiResult.getErrorTags() != null && !aiResult.getErrorTags().isEmpty()) {
-                errorTags = aiResult.getErrorTags();
+            // 使用AI评分（如果有），否则使用编辑距离评分
+            if (aiResult != null && aiResult.getScore() > 0) {
+                aiScore = aiResult.getScore();
             } else {
-                // 使用本地分析
-                errorTags = analyzeErrorTagsLocal(userText, audioText);
+                aiScore = editDistanceScore;
             }
-        }
 
-        // 生成结果分析（优先使用AI返回的建议）
-        String resultAnalysis;
-        if (aiResult != null && aiResult.getResultAnalysis() != null && !aiResult.getResultAnalysis().isEmpty()) {
-            resultAnalysis = aiResult.getResultAnalysis();
-        } else {
-            resultAnalysis = generateResultAnalysis(score, errorTags, 1);
+            // 计算最终得分：时长0.2 + 编辑距离0.5 + AI评分0.3
+            score = durationScore * 0.2f + editDistanceScore * 0.5f + aiScore * 0.3f;
+            System.out.println("最终得分为：" + score);
+
+            // 去除非中文字符进行位置分析
+            userText = userContent.replaceAll("[^\\u4e00-\\u9fa5a-zA-Z0-9]", "");
+            audioText = audioContent.replaceAll("[^\\u4e00-\\u9fa5a-zA-Z0-9]", "");
+            similarity = calculateEditDistanceScore(userContent, audioContent);
+
+            if (similarity < 100f) {
+                // 计算错误位置
+                errorPositions = calculateErrorPositions(userText, audioText);
+
+                // 使用AI返回的错误标签
+                if (aiResult != null && aiResult.getErrorTags() != null && !aiResult.getErrorTags().isEmpty()) {
+                    errorTags = aiResult.getErrorTags();
+                } else {
+                    // 使用本地分析
+                    errorTags = analyzeErrorTagsLocal(userText, audioText);
+                }
+            }
+
+            // 生成结果分析（优先使用AI返回的建议）
+            if (aiResult != null && aiResult.getResultAnalysis() != null && !aiResult.getResultAnalysis().isEmpty()) {
+                resultAnalysis = aiResult.getResultAnalysis();
+            } else {
+                resultAnalysis = "";
+            }
         }
 
         // 更新测试详情信息

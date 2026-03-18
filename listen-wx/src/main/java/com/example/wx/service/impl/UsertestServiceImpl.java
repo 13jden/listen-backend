@@ -77,9 +77,13 @@ public class UsertestServiceImpl extends ServiceImpl<UsertestMapper, Usertest> i
         String directoryName = userPath + "/" + user.getMedicalId() + new Date().getTime();
         // 创建File对象
         File directory = new File(directoryName);
-        boolean isCreated = directory.mkdirs();
-        if(!isCreated){
-            return null;
+        // 如果目录已存在，尝试创建（mkdirs可以处理这种情况）
+        if (!directory.exists()) {
+            boolean isCreated = directory.mkdirs();
+            if (!isCreated) {
+                log.error("创建用户测试目录失败: {}"+directoryName);
+                return null;
+            }
         }
         usertest.setTestFilePath(directoryName);
         System.out.println(usertest.getTestFilePath());
