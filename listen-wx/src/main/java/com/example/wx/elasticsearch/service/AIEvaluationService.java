@@ -1,7 +1,6 @@
 package com.example.wx.elasticsearch.service;
 
 import com.alibaba.dashscope.app.Application;
-import com.alibaba.dashscope.app.ApplicationOutput;
 import com.alibaba.dashscope.app.ApplicationParam;
 import com.alibaba.dashscope.app.ApplicationResult;
 import com.alibaba.dashscope.exception.InputRequiredException;
@@ -219,18 +218,44 @@ public class AIEvaluationService {
      * 从AI结果中提取评分
      */
     private String extractResult(ApplicationResult result) {
-        if (result == null || result.getOutput() == null) {
-            log.warn("AI返回结果为空");
+        try {
+            if (result == null) {
+                log.warn("AI返回结果为空");
+                return null;
+            }
+            
+            // 尝试从ApplicationOutput获取文本
+            Object output = result.getOutput();
+            if (output == null) {
+                log.warn("AI返回的output为空");
+                return null;
+            }
+            
+            // 尝试getText方法
+            try {
+                java.lang.reflect.Method getTextMethod = output.getClass().getMethod("getText");
+                Object textObj = getTextMethod.invoke(output);
+                if (textObj != null && !textObj.toString().isEmpty()) {
+                    log.info("AI返回文本: {}", textObj);
+                    return textObj.toString();
+                }
+            } catch (NoSuchMethodException e) {
+                // getText不存在
+            }
+            
+            // 尝试toString
+            String str = output.toString();
+            if (str != null && !str.isEmpty()) {
+                log.info("AI返回文本(toString): {}", str);
+                return str;
+            }
+            
+            log.warn("AI返回的text为空");
+            return null;
+        } catch (Exception e) {
+            log.error("提取AI结果失败", e);
             return null;
         }
-        ApplicationOutput output = result.getOutput();
-        if (output.getText() != null && !output.getText().isEmpty()) {
-            String aiText = output.getText();
-            log.info("AI返回文本: {}", aiText);
-            return aiText;
-        }
-        log.warn("AI返回的text为空");
-        return null;
     }
 
     /**
