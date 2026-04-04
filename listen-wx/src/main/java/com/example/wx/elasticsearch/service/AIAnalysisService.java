@@ -58,6 +58,7 @@ public class AIAnalysisService {
         private String startDate;          // 开始日期
         private String endDate;            // 结束日期
         private String userIds;            // 用户ID（可多选）
+        private String content;             // 自定义分析方向（如：侧重平翘舌区分）
         private boolean includeTrend;      // 是否包含趋势分析
         private boolean includeSuggestion; // 是否包含智能建议
         private boolean includeErrorAnalysis; // 是否包含错误分析
@@ -218,6 +219,9 @@ public class AIAnalysisService {
         }
         if (request.getStartDate() != null && !request.getStartDate().isEmpty()) {
             prompt.append(String.format("- 时间范围: %s 至 %s\n", request.getStartDate(), request.getEndDate()));
+        }
+        if (request.getContent() != null && !request.getContent().isEmpty()) {
+            prompt.append(String.format("- 重点分析方向: %s\n", request.getContent()));
         }
 
         // 分析要求
