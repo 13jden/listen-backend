@@ -32,6 +32,9 @@ public class AudioController {
     @Value("${temp.path}")
     private String tempPath;
 
+    @Value(("${upload.path}"))
+    private String filePath;
+
     /**
      * 获取音频列表（分页）
      */

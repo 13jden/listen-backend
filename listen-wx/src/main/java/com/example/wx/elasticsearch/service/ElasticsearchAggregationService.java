@@ -160,7 +160,7 @@ public class ElasticsearchAggregationService {
             sourceBuilder.query(boolQuery);
             sourceBuilder.size(0);
 
-            // testDate 是 keyword 类型，用 terms 聚合按月份字符串分组
+            // testDate 是 keyword 类型，使用 terms 聚合按月份字符串分组
             sourceBuilder.aggregation(
                     AggregationBuilders.terms("by_month")
                             .field("testDate")
@@ -175,6 +175,7 @@ public class ElasticsearchAggregationService {
                 Terms terms = (Terms) agg;
                 List<Terms.Bucket> bucketList = new ArrayList<>();
                 terms.getBuckets().forEach(bucketList::add);
+                // 按月份排序
                 bucketList.sort(Comparator.comparing(b -> b.getKeyAsString()));
                 
                 for (Terms.Bucket bucket : bucketList) {
@@ -185,6 +186,7 @@ public class ElasticsearchAggregationService {
                         months.add(key);
                     }
                     testCounts.add(bucket.getDocCount());
+                    
                     Avg avgAgg = bucket.getAggregations().get("avg_score");
                     avgScores.add(avgAgg != null ? avgAgg.getValue() : 0.0);
                 }
@@ -404,10 +406,10 @@ public class ElasticsearchAggregationService {
             sourceBuilder.query(buildDateRangeQuery(startDate, endDate));
             sourceBuilder.size(0);
 
-            // testDate 是 keyword 类型，用 terms 聚合按日期字符串分组
             sourceBuilder.aggregation(
-                    AggregationBuilders.terms("by_date")
+                    AggregationBuilders.dateHistogram("by_date")
                             .field("testDate")
+                            .calendarInterval(org.elasticsearch.search.aggregations.bucket.histogram.DateHistogramInterval.DAY)
                             .subAggregation(AggregationBuilders.cardinality("user_count").field("userId"))
                             .subAggregation(AggregationBuilders.avg("avg_score").field("totalScore"))
                             .subAggregation(AggregationBuilders.terms("by_status").field("completionStatus"))
@@ -417,34 +419,42 @@ public class ElasticsearchAggregationService {
             SearchResponse response = restHighLevelClient.search(searchRequest, RequestOptions.DEFAULT);
 
             Aggregation agg = response.getAggregations().get("by_date");
-            if (agg instanceof Terms) {
-                Terms terms = (Terms) agg;
-                List<Terms.Bucket> bucketList = new ArrayList<>();
-                terms.getBuckets().forEach(bucketList::add);
-                bucketList.sort(Comparator.comparing(b -> b.getKeyAsString()));
-                
-                for (Terms.Bucket bucket : bucketList) {
-                    DailyReportVO.DailyReportItem item = new DailyReportVO.DailyReportItem();
-                    item.setDate(bucket.getKeyAsString());
-                    item.setTestCount(bucket.getDocCount());
-                    
-                    Cardinality userCountAgg = bucket.getAggregations().get("user_count");
-                    item.setUserCount(userCountAgg != null ? userCountAgg.getValue() : 0);
-                    
-                    Avg avgAgg = bucket.getAggregations().get("avg_score");
-                    item.setAvgScore(avgAgg != null ? avgAgg.getValue() : 0.0);
-                    
-                    Terms statusTerms = bucket.getAggregations().get("by_status");
-                    long completed = 0, total = item.getTestCount();
-                    if (statusTerms != null) {
-                        for (Terms.Bucket statusBucket : statusTerms.getBuckets()) {
-                            if ("completed".equals(statusBucket.getKeyAsString())) {
-                                completed = statusBucket.getDocCount();
+            if (agg != null) {
+                try {
+                    java.lang.reflect.Method getBucketsMethod = agg.getClass().getMethod("getBuckets");
+                    Iterable<?> buckets = (Iterable<?>) getBucketsMethod.invoke(agg);
+                    for (Object bucket : buckets) {
+                        java.lang.reflect.Method getKeyMethod = bucket.getClass().getMethod("getKeyAsString");
+                        java.lang.reflect.Method getDocCountMethod = bucket.getClass().getMethod("getDocCount");
+                        java.lang.reflect.Method getAggsMethod = bucket.getClass().getMethod("getAggregations");
+                        
+                        DailyReportVO.DailyReportItem item = new DailyReportVO.DailyReportItem();
+                        item.setDate((String) getKeyMethod.invoke(bucket));
+                        item.setTestCount((Long) getDocCountMethod.invoke(bucket));
+                        
+                        Object aggs = getAggsMethod.invoke(bucket);
+                        java.lang.reflect.Method getAggMethod = aggs.getClass().getMethod("get", String.class);
+                        
+                        Cardinality userCountAgg = (Cardinality) getAggMethod.invoke(aggs, "user_count");
+                        item.setUserCount(userCountAgg != null ? userCountAgg.getValue() : 0);
+                        
+                        Avg avgAgg = (Avg) getAggMethod.invoke(aggs, "avg_score");
+                        item.setAvgScore(avgAgg != null ? avgAgg.getValue() : 0.0);
+                        
+                        Terms statusTerms = (Terms) getAggMethod.invoke(aggs, "by_status");
+                        long completed = 0, total = item.getTestCount();
+                        if (statusTerms != null) {
+                            for (Terms.Bucket statusBucket : statusTerms.getBuckets()) {
+                                if ("completed".equals(statusBucket.getKeyAsString())) {
+                                    completed = statusBucket.getDocCount();
+                                }
                             }
                         }
+                        item.setCompletionRate(total > 0 ? (double) completed / total * 100 : 0.0);
+                        items.add(item);
                     }
-                    item.setCompletionRate(total > 0 ? (double) completed / total * 100 : 0.0);
-                    items.add(item);
+                } catch (Exception e) {
+                    log.warn("每日报表解析失败", e);
                 }
             }
 
