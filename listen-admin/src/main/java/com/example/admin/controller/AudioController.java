@@ -33,7 +33,7 @@ public class AudioController {
     private String tempPath;
 
     @Value(("${upload.path}"))
-    private String filePath;
+    private String audioPath;
 
     /**
      * 获取音频列表（分页）
@@ -68,7 +68,7 @@ public class AudioController {
             String originalFilename = testAudio.getOriginalFilename();
             String extension = originalFilename.substring(originalFilename.lastIndexOf("."));
             String fileName = StringTools.getRandomBumber(10) + extension;
-            String fullPath = tempPath + "/" + fileName;
+            String fullPath = audioPath + "/" + fileName;
 
             // 保存文件
             File targetFile = new File(fullPath);
@@ -92,7 +92,7 @@ public class AudioController {
                            @RequestParam String adminId,
                            @RequestParam String fileName) {
         // 构建完整路径
-        String newFilePath = tempPath + "/" + fileName;
+        String newFilePath = audioPath + "/" + fileName;
         // 保存到数据库
         Audio audio = audioService.save(content, adminId, newFilePath);
         if (audio != null) {
@@ -107,7 +107,7 @@ public class AudioController {
      */
     @RequestMapping("deleteTempFile")
     public Result deleteTempFile(@RequestParam String fileName) {
-        String filePath = tempPath + "/" + fileName;
+        String filePath = audioPath + "/" + fileName;
         File file = new File(filePath);
         if (file.exists()) {
             boolean deleted = file.delete();
