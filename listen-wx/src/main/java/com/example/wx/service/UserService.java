@@ -18,13 +18,13 @@ public interface UserService extends IService<User> {
 
     UserInfoDto login(String openid);
 
-    TokenUserInfoDto register(String openid, String name, int hospitalId, String number, String medicalId, Integer age);
+    UserInfoDto register(String openid, String name, int hospitalId, String number, String medicalId, Integer age);
 
-    //查所有用户
     IPage<UserInfoDto> getUserList(int pageNum, int pageSize);
 
-    //通过手机号/医院名/姓名/模糊查询用户
-    IPage<UserInfoDto> getUser(String word,int pageNum,int pageSize);
+    IPage<UserInfoDto> getUser(String word, int pageNum, int pageSize);
 
     boolean deleteUser(String userId);
+
+    boolean updateUser(String userId, String name, Integer hospitalId, String number);
 }
