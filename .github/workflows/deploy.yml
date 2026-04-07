@@ -57,11 +57,10 @@ jobs:
             # 创建部署目录
             mkdir -p /opt/listen-bankend
 
-            # 创建文件上传目录（mkdir -p 不会删除已有文件，只创建不存在的目录）
-            mkdir -p /opt/listen/files
-            # 设置目录权限：目录755，文件644（不会删除文件）
-            find /opt/listen/files -type d -exec chmod 755 {} \; 2>/dev/null || true
-            find /opt/listen/files -type f -exec chmod 644 {} \; 2>/dev/null || true
+            # 创建文件上传目录
+            mkdir -p /usr/local/listen/audio
+            mkdir -p /usr/local/listen/temp
+            mkdir -p /usr/local/listen/userFile
 
             # 配置 SSH 密钥
             mkdir -p ~/.ssh
@@ -116,12 +115,10 @@ jobs:
             if docker compose version &> /dev/null; then
               echo "使用 docker compose V2"
               docker compose down || true
-              mkdir -p /opt/listen/files/audio
               docker compose up -d
             else
               echo "使用 docker-compose"
               docker-compose down || true
-              mkdir -p /opt/listen/files/audio
               docker-compose up -d
             fi
 
