@@ -17,6 +17,8 @@ public class TokenUserInfoDto implements Serializable {
 
         private String medicalId;
 
+        private Integer age;
+
         private String hospital;
 
         private Long expireAt;

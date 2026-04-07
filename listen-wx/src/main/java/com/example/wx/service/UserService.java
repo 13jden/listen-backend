@@ -18,7 +18,7 @@ public interface UserService extends IService<User> {
 
     UserInfoDto login(String openid);
 
-    TokenUserInfoDto register(String openid, String name, int hospitalId, String number,String medicalId);
+    TokenUserInfoDto register(String openid, String name, int hospitalId, String number, String medicalId, Integer age);
 
     //查所有用户
     IPage<UserInfoDto> getUserList(int pageNum, int pageSize);

@@ -11,8 +11,14 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * <p>
@@ -35,6 +41,9 @@ public class AudioController {
     @Value(("${upload.path}"))
     private String audioPath;
 
+    @Value("${ffmpeg.path}")
+    private String ffmpegPath;
+
     /**
      * 获取音频列表（分页）
      */
@@ -55,7 +64,7 @@ public class AudioController {
     }
 
     /**
-     * 上传音频文件（临时文件）
+     * 上传音频文件
      */
     @RequestMapping("uploadFile")
     public Result uploadAudio(@RequestParam("testAudio") MultipartFile testAudio) {
@@ -64,24 +73,61 @@ public class AudioController {
         }
 
         try {
-            // 生成随机文件名
             String originalFilename = testAudio.getOriginalFilename();
             String extension = originalFilename.substring(originalFilename.lastIndexOf("."));
             String fileName = StringTools.getRandomBumber(10) + extension;
             String fullPath = audioPath + "/" + fileName;
 
-            // 保存文件
             File targetFile = new File(fullPath);
             if (!targetFile.getParentFile().exists()) {
                 targetFile.getParentFile().mkdirs();
             }
             testAudio.transferTo(targetFile);
 
-            return Result.success(fileName);
+            Float durationSec = getAudioDuration(fullPath);
+
+            Map<String, Object> result = new HashMap<>();
+            result.put("fileName", fileName);
+            result.put("durationSec", durationSec);
+            return Result.success(result);
         } catch (IOException e) {
             e.printStackTrace();
             return Result.error("文件上传失败");
         }
+    }
+
+    /**
+     * 使用 FFmpeg 获取音频时长（秒）
+     */
+    private Float getAudioDuration(String filePath) {
+        try {
+            ProcessBuilder pb = new ProcessBuilder(ffmpegPath, "-i", filePath);
+            pb.redirectErrorStream(true);
+            Process process = pb.start();
+
+            StringBuilder output = new StringBuilder();
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    output.append(line).append("\n");
+                }
+            }
+
+            process.waitFor();
+
+            Pattern pattern = Pattern.compile("Duration: (\\d{2}):(\\d{2}):(\\d{2})\\.(\\d{2})");
+            Matcher matcher = pattern.matcher(output.toString());
+            if (matcher.find()) {
+                int hours = Integer.parseInt(matcher.group(1));
+                int minutes = Integer.parseInt(matcher.group(2));
+                int seconds = Integer.parseInt(matcher.group(3));
+                int centiseconds = Integer.parseInt(matcher.group(4));
+                return (float) (hours * 3600 + minutes * 60 + seconds + centiseconds / 100.0);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return null;
     }
 
     /**
@@ -90,11 +136,10 @@ public class AudioController {
     @RequestMapping("addFile")
     public Result addAudio(@RequestParam String content,
                            @RequestParam String adminId,
-                           @RequestParam String fileName) {
-        // 构建完整路径
+                           @RequestParam String fileName,
+                           @RequestParam(required = false) Float durationSec) {
         String newFilePath = audioPath + "/" + fileName;
-        // 保存到数据库
-        Audio audio = audioService.save(content, adminId, newFilePath);
+        Audio audio = audioService.save(content, adminId, newFilePath, durationSec);
         if (audio != null) {
             return Result.success(audio);
         } else {

@@ -59,15 +59,14 @@ public class UserController {
             redisComponent.cleanAdminToken(token);
         }
 
-        // 从 User 对象中提取字段值
         String openId = user.getOpenId();
         String name = user.getName();
         int hospitalId = user.getHospitalId();
         String number = user.getNumber();
         String medicalId = user.getMedicalId();
+        Integer age = user.getAge();
 
-        // 调用注册逻辑
-        TokenUserInfoDto tokenUserInfoDto = userService.register(openId, name, hospitalId, number, medicalId);
+        TokenUserInfoDto tokenUserInfoDto = userService.register(openId, name, hospitalId, number, medicalId, age);
         UserInfoDto userInfoDto =  userService.login(openId);
         controllerTool.saveToken2Cookie(response, token);
 

@@ -76,13 +76,11 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     }
 
     @Override
-    public TokenUserInfoDto register(String openid, String name,int hospitalId, String number,String medicalId) {
-        // 校验 openid 格式
+    public TokenUserInfoDto register(String openid, String name, int hospitalId, String number, String medicalId, Integer age) {
         if (StringTools.isEmpty(openid) || openid.length() > 100 || openid.getBytes().length != openid.length()) {
             throw new UserLoginException("openid 无效");
         }
 
-        // 检查是否已注册
         User existUser = userMapper.findByOpenId(openid);
         if (existUser != null) {
             throw new UserLoginException("用户已存在");
@@ -96,6 +94,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         user.setName(name);
         user.setNumber(number);
         user.setHospitalId(hospitalId);
+        user.setAge(age);
         user.setRegisterTime(new Date());
         userMapper.insert(user);
         TokenUserInfoDto tokenUserInfoDto = CopyTools.copy(user,TokenUserInfoDto.class);

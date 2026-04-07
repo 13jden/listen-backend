@@ -46,16 +46,14 @@ public class AudioServiceImpl extends ServiceImpl<AudioMapper, Audio> implements
     }
 
     @Override
-    public Audio save(String content, String adminId, String newFilePath) {
-        // 保存到数据库
+    public Audio save(String content, String adminId, String newFilePath, Float durationSec) {
         Audio audio = new Audio();
         audio.setContent(content);
         audio.setPath(newFilePath);
         audio.setAdminId(adminId);
         audio.setUploadTime(new Date());
         audio.setId(StringTools.getRandomBumber(Constants.LENGTH_10));
-//        redisComponent.deleteAudio(audio.getId());
-//        System.out.println("删除");
+        audio.setDurationSec(durationSec);
         if(audioMapper.insert(audio)>0)
             return audio;
         else

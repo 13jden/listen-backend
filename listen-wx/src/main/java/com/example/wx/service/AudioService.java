@@ -19,7 +19,7 @@ public interface AudioService extends IService<Audio> {
 
     List<Audio> getAudio(int num);
 
-    Audio save(String content, String adminId, String newFilePath);
+    Audio save(String content, String adminId, String newFilePath, Float durationSec);
 
     IPage<AudioDto> getListAudio(int pageNum, int pageSize);
 

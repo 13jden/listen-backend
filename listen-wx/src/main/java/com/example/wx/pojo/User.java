@@ -46,6 +46,11 @@ public class User implements Serializable {
 
     private String medicalId;
 
+    /**
+     * 年龄
+     */
+    private Integer age;
+
     private Date registerTime;
 
 
