@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.example.common.common.Result;
 import com.example.common.common.getHttpAudio;
 import com.example.common.constants.Constants;
+import com.example.common.redis.RedisComponent;
 import com.example.common.dto.TestDto;
 import com.example.common.dto.UserTestDto;
 import com.example.common.utils.StringTools;
@@ -60,6 +61,9 @@ public class UsertestServiceImpl extends ServiceImpl<UsertestMapper, Usertest> i
     @Autowired
     private ElasticsearchSyncService elasticsearchSyncService;
 
+    @Autowired
+    private RedisComponent redisComponent;
+
     @Value("${userFile.path}")
     private String userPath;
 
@@ -113,6 +117,7 @@ public class UsertestServiceImpl extends ServiceImpl<UsertestMapper, Usertest> i
             testDto.setTestAudioPath(getHttpAudio.getAudioUrl(testdetail.getUserAudioPath()));
             testDtoList.add(testDto);
         }
+        redisComponent.deleteIndexDataCache();
         return testDtoList;
     }
 
@@ -148,6 +153,7 @@ public class UsertestServiceImpl extends ServiceImpl<UsertestMapper, Usertest> i
                     testdetailMapper.deleteById(t);
                 }
                 usertestMapper.deleteById(usertest);
+                redisComponent.deleteTestDetailCache(testId);
             }
 
 
@@ -224,6 +230,7 @@ public class UsertestServiceImpl extends ServiceImpl<UsertestMapper, Usertest> i
         usertest.setNum(n);
         usertest.setResultAnalysis(resultAnalysis);
         usertestMapper.updateById(usertest);
+        redisComponent.deleteIndexDataCache();
 
         // 同步到ES
         elasticsearchSyncService.syncTestToEs(testId);

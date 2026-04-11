@@ -1,11 +1,10 @@
 package com.example.wx.service.impl;
 
-import com.example.common.api.aliApi;
+import com.example.common.api.AliApi;
 import com.example.common.common.Result;
 import com.example.common.common.getHttpAudio;
-import com.example.common.constants.Constants;
 import com.example.common.dto.TestDto;
-import com.example.common.dto.TokenUserInfoDto;
+import com.example.common.dto.TestScoreTaskMessage;
 import com.example.common.dto.UserDetailInfo;
 import com.example.common.redis.RedisComponent;
 import com.example.common.utils.CopyTools;
@@ -69,6 +68,9 @@ public class TestdetailServiceImpl extends ServiceImpl<TestdetailMapper, Testdet
     @Autowired
     private AIEvaluationService aiEvaluationService;
 
+    @Autowired
+    private AliApi aliApi;
+
     @Value("${ffmpeg.path}")
     private String ffmpegPath;
 
@@ -101,172 +103,101 @@ public class TestdetailServiceImpl extends ServiceImpl<TestdetailMapper, Testdet
     * */
     @Override
     public Result OneUserAudioUpload(MultipartFile testAudio, String testDetailId) throws Exception {
-        // 查询测试详情
         Testdetail testdetail = testdetailMapper.selectById(testDetailId);
         if (testdetail == null) {
             throw new RuntimeException("测试详情不存在");
         }
-        if (testdetail.getUserAudioPath()!=null){
-            //如果上传过相应的文件，则删除文件
-            File oldFile = new File(testdetail.getUserAudioPath());
-            oldFile.delete();
-            System.out.println("删除成功");
+        if (testdetail.getUserAudioPath() != null) {
+            new File(testdetail.getUserAudioPath()).delete();
         }
 
-        // 查询用户测试信息
         Usertest usertest = usertestMapper.selectById(testdetail.getTestId());
-
         if (usertest == null) {
             throw new RuntimeException("用户测试信息不存在");
         }
 
-        // 查询音频信息
         Audio audio = audioMapper.selectById(testdetail.getAudioId());
         if (audio == null) {
             throw new RuntimeException("音频信息不存在");
         }
 
-        // 保存音频文件
         String originalFilename = testAudio.getOriginalFilename();
         String extension = originalFilename.substring(originalFilename.lastIndexOf("."));
-        String fileName = testdetail.getIndex()+extension; // 序号 + 原拓展名
-        String tempName = 100-testdetail.getIndex() + extension;
+        String fileName = testdetail.getIndex() + extension;
+        String tempName = 100 - testdetail.getIndex() + extension;
         String tempPath = usertest.getTestFilePath() + "/" + tempName;
         String fullPath = usertest.getTestFilePath() + "/" + fileName;
-        System.out.println("保存路径: " + fullPath);
 
         File targetFile = new File(tempPath);
-        try {
-            // 创建目录（如果不存在）
-            if (!targetFile.getParentFile().exists()) {
-                targetFile.getParentFile().mkdirs();
-            }
-            // 保存文件
-            testAudio.transferTo(targetFile);
-        } catch (IOException e) {
-            e.printStackTrace();
-            throw new RuntimeException("文件保存失败");
+        if (!targetFile.getParentFile().exists()) {
+            targetFile.getParentFile().mkdirs();
         }
-        System.out.println("保存成功，准备修改格式");
-        // 调用FFmpeg修改采样频率
+        testAudio.transferTo(targetFile);
+
         try {
-            modifyAudioSampleRate(tempPath,fullPath);
+            modifyAudioSampleRate(tempPath, fullPath);
         } catch (IOException e) {
             return Result.error("修改音频采样频率失败");
         }
-        System.out.println("格式修改成功，准备识别语音");
-        targetFile.delete();//删除缓存音频；
-        // 调用阿里云语音识别 API
-        String userContent = aliApi.getString(fullPath); // 上传文件并获取识别结果
-        String audioContent = audio.getContent(); // 标准音频文本
-        System.out.println("识别文字是："+userContent+"正确的文字是："+audioContent);
+        targetFile.delete();
 
-        // 标记识别是否为空
-        boolean isEmptyRecognition = (userContent == null || userContent.trim().isEmpty()||userContent.equals(""));
-        if (isEmptyRecognition) {
-            log.warn("语音识别结果为空");
-        }
+        String userContent = aliApi.getString(fullPath);
+        String audioContent = audio.getContent();
+        boolean isEmptyRecognition = (userContent == null || userContent.trim().isEmpty());
 
-        // 获取用户语音时长
         float userDuration = getAudioDuration(fullPath);
-        System.out.println("用户语音时长: " + userDuration + "秒");
-
-        // 获取标准音频时长
         float standardDuration = audio.getDurationSec() != null ? audio.getDurationSec() : 0f;
-        System.out.println("标准音频时长: " + standardDuration + "秒");
 
-        System.out.println("现在开始计算得分");
-
-        // 统一调用AI服务获取评分、错误标签和结果分析
-        AIEvaluationService.AIEvaluationResult aiResult = null;
-        try {
-            aiResult = aiEvaluationService.evaluate(userContent, audioContent);
-        } catch (Exception e) {
-            log.error("AI评分调用失败: {}"+e.getMessage());
+        if (isEmptyRecognition) {
+            return Result.error("语音识别为空，请重试");
         }
 
-        // 计算各部分得分
-        float durationScore = 0;
-        float editDistanceScore = 0;
-        float aiScore = 0;
-        float score = 0;
-        String errorPositions = "";
-        String errorTags = "";
-        String resultAnalysis = "";
-        String userText = "";
-        String audioText = "";
-        float similarity = 100f;
+        float editDistanceScore = calculateEditDistanceScore(userContent, audioContent);
 
-        if (!isEmptyRecognition) {
-            // 计算各部分得分
-            durationScore = calculateDurationScore(userDuration, standardDuration);
-            editDistanceScore = calculateEditDistanceScore(userContent, audioContent);
+        if (editDistanceScore == 0f) {
+            testdetail.setUserAudioPath(fullPath);
+            testdetail.setUserContent(userContent);
+            testdetail.setTestTime(new Date());
+            testdetail.setScore(0f);
+            testdetail.setSpeechDurationSec(userDuration);
+            testdetail.setStandardDurationSec(standardDuration);
+            testdetail.setDurationScore(0f);
+            testdetail.setEditDistanceScore(0f);
+            testdetail.setAiScore(0f);
+            testdetailMapper.updateById(testdetail);
+            redisComponent.deleteTestDetailCache(testdetail.getTestId());
+            redisComponent.deleteAudio(audio.getId());
 
-            // 使用AI评分（如果有），否则使用编辑距离评分
-            if (aiResult != null && aiResult.getScore() > 0) {
-                aiScore = aiResult.getScore();
-            } else {
-                aiScore = editDistanceScore;
-            }
-
-            // 计算最终得分：时长0.2 + 编辑距离0.5 + AI评分0.3
-            score = durationScore * 0.2f + editDistanceScore * 0.5f + aiScore * 0.3f;
-            System.out.println("最终得分为：" + score);
-
-            // 去除非中文字符进行位置分析
-            userText = userContent.replaceAll("[^\\u4e00-\\u9fa5a-zA-Z0-9]", "");
-            audioText = audioContent.replaceAll("[^\\u4e00-\\u9fa5a-zA-Z0-9]", "");
-            similarity = calculateEditDistanceScore(userContent, audioContent);
-
-            if (similarity < 100f) {
-                // 计算错误位置
-                errorPositions = calculateErrorPositions(userText, audioText);
-
-                // 使用AI返回的错误标签
-                if (aiResult != null && aiResult.getErrorTags() != null && !aiResult.getErrorTags().isEmpty()) {
-                    errorTags = aiResult.getErrorTags();
-                } else {
-                    // 使用本地分析
-                    errorTags = analyzeErrorTagsLocal(userText, audioText);
-                }
-            }
-
-            // 生成结果分析（优先使用AI返回的建议）
-            if (aiResult != null && aiResult.getResultAnalysis() != null && !aiResult.getResultAnalysis().isEmpty()) {
-                resultAnalysis = aiResult.getResultAnalysis();
-            } else {
-                resultAnalysis = "";
-            }
+            TestDto testDto = CopyTools.copy(testdetail, TestDto.class);
+            testDto.setAudioPath(getHttpAudio.getAudioUrl(audio.getPath()));
+            testDto.setTestAudioPath(getHttpAudio.getAudioUrl(fullPath));
+            return Result.success(testDto);
         }
 
-        // 更新测试详情信息
         testdetail.setUserAudioPath(fullPath);
         testdetail.setUserContent(userContent);
-        testdetail.setTestTime(new Date());
-        testdetail.setScore(score);
-        testdetail.setErrorPositions(errorPositions);
-        testdetail.setErrorTags(errorTags);
-        testdetail.setResultAnalysis(resultAnalysis);
         testdetail.setSpeechDurationSec(userDuration);
         testdetail.setStandardDurationSec(standardDuration);
-
-        testdetail.setDurationScore(durationScore);
-        testdetail.setEditDistanceScore(editDistanceScore);
-        testdetail.setAiScore(aiScore);
-
         testdetailMapper.updateById(testdetail);
-        // 返回 DTO
+        redisComponent.deleteTestDetailCache(testdetail.getTestId());
+        redisComponent.deleteAudio(audio.getId());
+
+        TestScoreTaskMessage message = TestScoreTaskMessage.builder()
+                .testDetailId(testDetailId)
+                .userContent(userContent)
+                .audioContent(audioContent)
+                .audioId(audio.getId())
+                .userAudioPath(fullPath)
+                .userDuration(userDuration)
+                .standardDuration(standardDuration)
+                .build();
+        redisComponent.lpushScoreTask(message);
+
+        // 先返回基础信息（score 等消费端异步写入）
         TestDto testDto = CopyTools.copy(testdetail, TestDto.class);
         testDto.setAudioPath(getHttpAudio.getAudioUrl(audio.getPath()));
-        testDto.setScore(score);
-        testDto.setTestAudioPath(getHttpAudio.getAudioUrl(testdetail.getUserAudioPath()));
-        testDto.setErrorPositions(errorPositions);
-        testDto.setErrorTags(errorTags);
-        testDto.setResultAnalysis(resultAnalysis);
-
-        // 同步单条测试详情到ES
-        elasticsearchSyncService.syncTestItemToEs(testDto);
-
+        testDto.setTestAudioPath(getHttpAudio.getAudioUrl(fullPath));
+        // 正在评分中，前端可轮询或等待 WebSocket 推送更新
         return Result.success(testDto);
     }
 
@@ -342,31 +273,20 @@ public class TestdetailServiceImpl extends ServiceImpl<TestdetailMapper, Testdet
     }
 
     /**
-     * 计算最终得分
-     * 评分权重：时长得分0.2 + 编辑距离得分0.5 + AI评分0.3
-     *
-     * @param userContent   用户语音识别结果
-     * @param audioContent  标准音频文本
-     * @param userDuration  用户语音时长（秒）
-     * @param standardDuration 标准音频时长（秒）
-     * @return 最终得分
+     * 与 com.example.wx.service.TestScoreTaskConsumer 一致：相似度 100% 为满分；否则 相似度×0.5 + AI score×0.3 + 时长得分×0.2。
+     * 本方法无 AI 调用时，0.3 项用相似度兜底（与消费端 AI 缺失时一致）。
      */
     private float calculateFinalScore(String userContent, String audioContent, float userDuration, float standardDuration) {
-        // 1. 时长得分（0.2权重）
         float durationScore = calculateDurationScore(userDuration, standardDuration);
-
-        // 2. 编辑距离得分（0.5权重）
-        float editDistanceScore = calculateEditDistanceScore(userContent, audioContent);
-
-        // 3. AI评分（0.3权重）- 预留，先用编辑距离得分代替
-        float aiScore = calculateAiScore(userContent, audioContent);
-
-        // 计算最终得分
-        float finalScore = durationScore * 0.2f + editDistanceScore * 0.5f + aiScore * 0.3f;
-
-        System.out.println(String.format("得分明细 - 时长得分: %.2f, 编辑距离得分: %.2f, AI得分: %.2f, 最终得分: %.2f",
-                durationScore, editDistanceScore, aiScore, finalScore));
-
+        float similarityScore = calculateEditDistanceScore(userContent, audioContent);
+        if (similarityScore >= 100f) {
+            return 100f;
+        }
+        float aiRaw = similarityScore;
+        float finalScore = similarityScore * 0.5f + aiRaw * 0.3f + durationScore * 0.2f;
+        finalScore = Math.max(0f, Math.min(100f, finalScore));
+        System.out.println(String.format("得分明细 - 时长得分: %.2f, 相似度: %.2f, AI项(兜底): %.2f, 最终得分: %.2f",
+                durationScore, similarityScore, aiRaw, finalScore));
         return finalScore;
     }
 
@@ -429,19 +349,6 @@ public class TestdetailServiceImpl extends ServiceImpl<TestdetailMapper, Testdet
         }
 
         return (float) ((1 - (double) distance / maxLength) * 100);
-    }
-
-    /**
-     * 计算AI评分
-     * 优先使用编辑距离评分（因为AI服务已经在OneUserAudioUpload中统一调用了）
-     *
-     * @param userContent   用户语音识别结果
-     * @param audioContent  标准音频文本
-     * @return AI评分（0-100）
-     */
-    private float calculateAiScore(String userContent, String audioContent) {
-        // AI服务已经在OneUserAudioUpload中调用过了，这里直接使用编辑距离评分作为兜底
-        return calculateEditDistanceScore(userContent, audioContent);
     }
 
     /**

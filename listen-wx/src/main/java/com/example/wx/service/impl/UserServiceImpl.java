@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.example.common.constants.Constants;
 import com.example.common.dto.UserInfoDto;
+import com.example.common.redis.RedisComponent;
 import com.example.common.exception.UserLoginException;
 import com.example.common.utils.CopyTools;
 import com.example.common.utils.StringTools;
@@ -33,6 +34,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     private final UserMapper userMapper;
     private final HospitalMapper hospitalMapper;
     private final UsertestMapper usertestMapper;
+    private final RedisComponent redisComponent;
 
     @Override
     public UserInfoDto login(String openid) {
@@ -64,6 +66,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         user.setAge(age);
         user.setRegisterTime(new Date());
         userMapper.insert(user);
+        redisComponent.deleteIndexDataCache();
 
         return buildUserInfoDto(user);
     }
@@ -120,6 +123,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
             }
         }
         userMapper.deleteById(userId);
+        redisComponent.deleteIndexDataCache();
         return true;
     }
 
@@ -139,6 +143,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
             user.setNumber(number);
         }
         userMapper.updateById(user);
+        redisComponent.deleteIndexDataCache();
         return true;
     }
 

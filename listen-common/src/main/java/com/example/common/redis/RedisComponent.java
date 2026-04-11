@@ -84,12 +84,25 @@ public class RedisComponent {
         redisUtils.setex(Constants.REDIS_KEY_AUDIO_SCORE+id,audioDto,Constants.REDIS_KEY_EXPIRES_ONE_DAY);
     }
 
+    /** 删除音频列表缓存（须在数据库对音频的增删改成功后调用，先 DB 再删缓存） */
     public void deleteAudio(String id) {
-        // 检查 Redis 中是否存在该音频数据
-        if (redisUtils.get(Constants.REDIS_KEY_AUDIO_SCORE + id) != null) {
-            // 如果存在，则删除该键值对
-            redisUtils.delete(Constants.REDIS_KEY_AUDIO_SCORE + id);
+        if (id == null || id.isEmpty()) {
+            return;
         }
+        redisUtils.delete(Constants.REDIS_KEY_AUDIO_SCORE + id);
+    }
+
+    /** 删除管理端「测试详情列表」缓存 */
+    public void deleteTestDetailCache(String testId) {
+        if (testId == null || testId.isEmpty()) {
+            return;
+        }
+        redisUtils.delete(Constants.REDIS_KEY_TESTDETAIL + testId);
+    }
+
+    /** 删除首页统计缓存 */
+    public void deleteIndexDataCache() {
+        redisUtils.delete(Constants.REDIS_KEY_PRE + "IndexData:");
     }
 
     public void saveDataInfo(IndexDataVO indexData) {
@@ -97,6 +110,18 @@ public class RedisComponent {
     }
     public IndexDataVO getDataInfo() {
         return (IndexDataVO) redisUtils.get(Constants.REDIS_KEY_PRE+"IndexData:");
+    }
+
+    public void lpushScoreTask(TestScoreTaskMessage message) {
+        redisUtils.lpush("listen:score:queue", message, null);
+    }
+
+    public TestScoreTaskMessage rpopScoreTask() {
+        Object result = redisUtils.rpop("listen:score:queue");
+        if (result instanceof TestScoreTaskMessage) {
+            return (TestScoreTaskMessage) result;
+        }
+        return null;
     }
 
 }

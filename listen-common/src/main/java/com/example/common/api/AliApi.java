@@ -2,8 +2,10 @@ package com.example.common.api;
 
 
 import org.springframework.context.annotation.Bean;
+import org.springframework.stereotype.Component;
 
-public class aliApi {
+@Component
+public class AliApi {
 
     private static String appKey = "mDqEdf7G7QWRKyZ1";
     private static String accessKeyId = "LTAI5tQn8KAj4dVkpg7uwpgT";

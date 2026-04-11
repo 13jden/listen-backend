@@ -1,5 +1,6 @@
 package com.example.wx.elasticsearch.entity;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.Data;
 
 import java.time.LocalDateTime;
@@ -48,13 +49,15 @@ public class TestEs {
     private String sex;
 
     /**
-     * 测试开始时间
+     * 测试开始时间（与 ES date 映射含毫秒格式一致）
      */
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss.SSS")
     private LocalDateTime startTime;
 
     /**
      * 测试结束时间
      */
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss.SSS")
     private LocalDateTime endTime;
 
     /**

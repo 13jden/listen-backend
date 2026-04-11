@@ -62,7 +62,12 @@ public class AudioServiceImpl extends ServiceImpl<AudioMapper, Audio> implements
             throw new RuntimeException("文件保存失败", e);
         }
 
-        Float durationSec = getAudioDuration(fullPath);
+        Float durationSec;
+        try {
+            durationSec = getAudioDuration(fullPath);
+        } catch (Exception e) {
+            durationSec = null;
+        }
 
         return AudioUploadResponse.builder()
                 .fileName(fileName)
@@ -105,7 +110,9 @@ public class AudioServiceImpl extends ServiceImpl<AudioMapper, Audio> implements
             existingAudio.setPath(path);
         }
 
-        audioMapper.updateById(existingAudio);
+        if (audioMapper.updateById(existingAudio) > 0) {
+            redisComponent.deleteAudio(id);
+        }
         return toAudioDto(existingAudio);
     }
 
@@ -116,7 +123,9 @@ public class AudioServiceImpl extends ServiceImpl<AudioMapper, Audio> implements
             if (audio.getPath() != null) {
                 deleteFile(audio.getPath());
             }
-            audioMapper.deleteById(id);
+            if (audioMapper.deleteById(id) > 0) {
+                redisComponent.deleteAudio(id);
+            }
             return true;
         }
         return false;

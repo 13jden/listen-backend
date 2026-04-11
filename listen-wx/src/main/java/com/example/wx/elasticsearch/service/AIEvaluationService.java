@@ -42,9 +42,12 @@ public class AIEvaluationService {
      */
     public static class AIEvaluationResult {
         /**
-         * AI评分（0-100）
+         * AI 返回的原始 score（0-100），仅作加权中的 0.3 权重使用；与文本相似度无关。
          */
         private float score;
+
+        /** 是否从 AI 响应中解析到了 score 字段（含数值 0） */
+        private boolean aiRawScorePresent;
 
         /**
          * 错误标签（如"平翘舌","前后鼻音"等，用逗号分隔）
@@ -92,6 +95,14 @@ public class AIEvaluationService {
         public void setErrorDetail(String errorDetail) {
             this.errorDetail = errorDetail;
         }
+
+        public boolean isAiRawScorePresent() {
+            return aiRawScorePresent;
+        }
+
+        public void setAiRawScorePresent(boolean aiRawScorePresent) {
+            this.aiRawScorePresent = aiRawScorePresent;
+        }
     }
 
     /**
@@ -111,6 +122,7 @@ public class AIEvaluationService {
             log.info("文本相似度达到100%，直接返回满分，无需AI评分");
             AIEvaluationResult result = new AIEvaluationResult();
             result.setScore(100f);
+            result.setAiRawScorePresent(false);
             result.setErrorTags("");
             result.setResultAnalysis("您的发音非常标准，与标准文本完全一致！");
             return result;
@@ -158,10 +170,14 @@ public class AIEvaluationService {
 
             log.info("AI评分请求参数 - userText: {}, standardText: {}", userContent, audioContent);
 
+            String prompt = "请根据用户发音与标准文本对比评分。请仅输出一个 JSON 对象，不要其它说明，格式示例："
+                    + "{\"score\":\"90\",\"error\":\"带->打\",\"errortag\":\"\",\"suggestion\":\"一两句话总结和建议\"}。"
+                    + " userText: " + userContent + ", standardText: " + audioContent;
+
             ApplicationParam param = ApplicationParam.builder()
                     .apiKey(apiKey)
                     .appId(appId)
-                    .prompt("请根据用户发音和标准文本进行评分")
+                    .prompt(prompt)
                     .bizParams(bizParamJson)
                     .incrementalOutput(false)
                     .hasThoughts(false)
@@ -268,25 +284,33 @@ public class AIEvaluationService {
             return createEmptyResult();
         }
 
-        // 尝试解析JSON格式的响应
-        try {
-            JsonObject jsonResponse = gson.fromJson(aiResponse, JsonObject.class);
+        String jsonPayload = extractJsonObjectPayload(aiResponse.trim());
 
-            // 提取评分（score 或 评分）- 如果没有则使用编辑距离计算
-            if (jsonResponse.has("score")) {
-                result.setScore(jsonResponse.get("score").getAsFloat());
-            } else if (jsonResponse.has("评分")) {
-                result.setScore(Float.parseFloat(jsonResponse.get("评分").getAsString()));
-            } else {
-                // 没有评分字段，后续会用编辑距离算法计算
+        // 尝试解析JSON格式的响应（约定：{"score":"90","error":"带->打","errortag":"","suggestion":"..."}）
+        try {
+            JsonObject jsonResponse = gson.fromJson(jsonPayload, JsonObject.class);
+            if (jsonResponse == null) {
+                throw new IllegalArgumentException("empty json");
             }
 
-            // 提取错误详情 -> 错误位置
+            if (jsonResponse.has("score")) {
+                float s = parseScoreElement(jsonResponse.get("score"));
+                if (s >= 0) {
+                    result.setScore(s);
+                    result.setAiRawScorePresent(true);
+                }
+            } else if (jsonResponse.has("评分")) {
+                float s = parseScoreElement(jsonResponse.get("评分"));
+                if (s >= 0) {
+                    result.setScore(s);
+                    result.setAiRawScorePresent(true);
+                }
+            }
+
             if (jsonResponse.has("error")) {
                 result.setErrorDetail(jsonResponse.get("error").getAsString());
             }
 
-            // 提取错误标签（errorTags 或 errortag 或 错误标签）
             if (jsonResponse.has("errorTags")) {
                 result.setErrorTags(jsonResponse.get("errorTags").getAsString());
             } else if (jsonResponse.has("errortag")) {
@@ -295,25 +319,21 @@ public class AIEvaluationService {
                 result.setErrorTags(jsonResponse.get("错误标签").getAsString());
             }
 
-            // 提取结果分析（resultAnalysis 或 suggestion 或 结果分析）
-            if (jsonResponse.has("resultAnalysis")) {
-                result.setResultAnalysis(jsonResponse.get("resultAnalysis").getAsString());
-            } else if (jsonResponse.has("suggestion")) {
+            if (jsonResponse.has("suggestion")) {
                 result.setResultAnalysis(jsonResponse.get("suggestion").getAsString());
+            } else if (jsonResponse.has("resultAnalysis")) {
+                result.setResultAnalysis(jsonResponse.get("resultAnalysis").getAsString());
             } else if (jsonResponse.has("结果分析")) {
                 result.setResultAnalysis(jsonResponse.get("结果分析").getAsString());
             } else {
-                // 如果没有明确的字段，整个JSON作为结果分析
-                result.setResultAnalysis(aiResponse);
+                result.setResultAnalysis(jsonPayload);
             }
 
         } catch (Exception e) {
-            // 如果不是JSON格式，尝试从文本中提取评分
             log.warn("AI响应非JSON格式，尝试文本解析: {}", aiResponse);
             parseTextResponse(aiResponse, result);
         }
 
-        // 确保评分有效（如果没有从AI获取到评分，后续会在TestdetailServiceImpl中用编辑距离计算）
         if (result.getScore() > 100) {
             result.setScore(100);
         }
@@ -322,14 +342,51 @@ public class AIEvaluationService {
     }
 
     /**
+     * 从整段回复中取出 JSON 对象（兼容 ```json ... ``` 或前后说明文字）
+     */
+    private String extractJsonObjectPayload(String text) {
+        int start = text.indexOf('{');
+        int end = text.lastIndexOf('}');
+        if (start >= 0 && end > start) {
+            return text.substring(start, end + 1);
+        }
+        return text;
+    }
+
+    /** 解析 score 字段，支持数字或字符串 "90"；失败返回 -1 */
+    private float parseScoreElement(com.google.gson.JsonElement el) {
+        if (el == null || el.isJsonNull()) {
+            return -1;
+        }
+        try {
+            if (el.isJsonPrimitive()) {
+                com.google.gson.JsonPrimitive p = el.getAsJsonPrimitive();
+                if (p.isNumber()) {
+                    return p.getAsFloat();
+                }
+                if (p.isString()) {
+                    String s = p.getAsString().trim();
+                    if (s.isEmpty()) {
+                        return -1;
+                    }
+                    return Float.parseFloat(s);
+                }
+            }
+        } catch (Exception ignored) {
+            return -1;
+        }
+        return -1;
+    }
+
+    /**
      * 从文本中解析评分结果
      */
     private void parseTextResponse(String text, AIEvaluationResult result) {
-        // 提取评分数字
         Pattern scorePattern = Pattern.compile("(\\d+(?:\\.\\d+)?)\\s*分");
         Matcher scoreMatcher = scorePattern.matcher(text);
         if (scoreMatcher.find()) {
             result.setScore(Float.parseFloat(scoreMatcher.group(1)));
+            result.setAiRawScorePresent(true);
         }
 
         // 提取错误标签
@@ -353,6 +410,7 @@ public class AIEvaluationService {
     private AIEvaluationResult createEmptyResult() {
         AIEvaluationResult result = new AIEvaluationResult();
         result.setScore(0);
+        result.setAiRawScorePresent(false);
         result.setErrorTags("");
         result.setResultAnalysis("AI评分失败");
         return result;
@@ -365,6 +423,7 @@ public class AIEvaluationService {
         AIEvaluationResult result = new AIEvaluationResult();
         float similarity = calculateTextSimilarity(userContent, audioContent);
         result.setScore(similarity);
+        result.setAiRawScorePresent(false);
 
         // 简单的错误标签分析
         StringBuilder errorTags = new StringBuilder();
