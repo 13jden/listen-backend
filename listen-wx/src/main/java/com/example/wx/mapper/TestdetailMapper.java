@@ -36,10 +36,7 @@ public interface TestdetailMapper extends BaseMapper<Testdetail> {
             "FROM testdetail WHERE id = #{testDetailId}")
     Testdetail selectById(String testDetailId);
 
-    @Update("UPDATE testdetail SET test_id = #{testId}, audio_id = #{audioId}, user_audio_path = #{userAudioPath}, " +
-            "`index` = #{index}, score = #{score}, user_content = #{userContent}, test_time = #{testTime} " +
-            "WHERE id = #{id}")
-    int updateById(Testdetail testDetail);
+
 
     @Select("SELECT * FROM testdetail WHERE test_id = #{testId}"+
             "ORDER BY `index` ASC")
@@ -54,4 +51,32 @@ public interface TestdetailMapper extends BaseMapper<Testdetail> {
 
     @Select("SELECT id, test_id, audio_id, user_audio_path, `index`, score, user_content, test_time FROM testdetail")
     List<Testdetail> selectList();
+
+    @Update({"<script>",
+            "UPDATE testdetail",
+            "<set>",
+            "<if test='testId != null'>test_id = #{testId},</if>",
+            "<if test='audioId != null'>audio_id = #{audioId},</if>",
+            "<if test='userAudioPath != null'>user_audio_path = #{userAudioPath},</if>",
+            "<if test='index != null'>`index` = #{index},</if>",
+            "<if test='score != null'>score = #{score},</if>",
+            "<if test='userContent != null'>user_content = #{userContent},</if>",
+            "<if test='testTime != null'>test_time = #{testTime},</if>",
+            "<if test='errorPositions != null'>error_positions = #{errorPositions},</if>",
+            "<if test='errorTags != null'>error_tags = #{errorTags},</if>",
+            "<if test='resultAnalysis != null'>result_analysis = #{resultAnalysis},</if>",
+            "<if test='speechDurationSec != null'>speech_duration_sec = #{speechDurationSec},</if>",
+            "<if test='standardDurationSec != null'>standard_duration_sec = #{standardDurationSec},</if>",
+            "<if test='durationScore != null'>duration_score = #{durationScore},</if>",
+            "<if test='editDistanceScore != null'>edit_distance_score = #{editDistanceScore},</if>",
+            "<if test='aiScore != null'>ai_score = #{aiScore},</if>",
+            "</set>",
+            "WHERE id = #{id}",
+            "</script>"})
+    int updateByIdSelective(Testdetail testDetail);
+
+    @Update("UPDATE testdetail SET test_id = #{testId}, audio_id = #{audioId}, user_audio_path = #{userAudioPath}, " +
+            "`index` = #{index}, score = #{score}, user_content = #{userContent}, test_time = #{testTime} " +
+            "WHERE id = #{id}")
+    int updateById(Testdetail testDetail);
 }

@@ -2,6 +2,7 @@ package com.example.common.redis;
 
 import com.example.common.constants.Constants;
 import com.example.common.dto.*;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Component;
 
@@ -10,6 +11,8 @@ import java.util.UUID;
 
 @Component
 public class RedisComponent {
+
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Resource
     private RedisUtils redisUtils;
@@ -113,15 +116,24 @@ public class RedisComponent {
     }
 
     public void lpushScoreTask(TestScoreTaskMessage message) {
-        redisUtils.lpush("listen:score:queue", message, null);
+        boolean success = redisUtils.lpush("listen:score:queue", message, null);
+        System.out.println("lpushScoreTask 结果: " + success + ", message: " + message);
     }
 
     public TestScoreTaskMessage rpopScoreTask() {
         Object result = redisUtils.rpop("listen:score:queue");
+        if (result == null) {
+            return null;
+        }
         if (result instanceof TestScoreTaskMessage) {
             return (TestScoreTaskMessage) result;
         }
-        return null;
+        try {
+            return objectMapper.convertValue(result, TestScoreTaskMessage.class);
+        } catch (Exception e) {
+            System.out.println("rpopScoreTask 反序列化失败，实际类型: " + result.getClass().getName() + ", 内容: " + result);
+            return null;
+        }
     }
 
 }

@@ -7,6 +7,7 @@ import com.alibaba.dashscope.exception.InputRequiredException;
 import com.alibaba.dashscope.exception.NoApiKeyException;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
+import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -40,6 +41,7 @@ public class AIEvaluationService {
     /**
      * AI评分结果
      */
+    @Data
     public static class AIEvaluationResult {
         /**
          * AI 返回的原始 score（0-100），仅作加权中的 0.3 权重使用；与文本相似度无关。
@@ -64,37 +66,6 @@ public class AIEvaluationService {
          */
         private String errorDetail;
 
-        public float getScore() {
-            return score;
-        }
-
-        public void setScore(float score) {
-            this.score = score;
-        }
-
-        public String getErrorTags() {
-            return errorTags;
-        }
-
-        public void setErrorTags(String errorTags) {
-            this.errorTags = errorTags;
-        }
-
-        public String getResultAnalysis() {
-            return resultAnalysis;
-        }
-
-        public void setResultAnalysis(String resultAnalysis) {
-            this.resultAnalysis = resultAnalysis;
-        }
-
-        public String getErrorDetail() {
-            return errorDetail;
-        }
-
-        public void setErrorDetail(String errorDetail) {
-            this.errorDetail = errorDetail;
-        }
 
         public boolean isAiRawScorePresent() {
             return aiRawScorePresent;

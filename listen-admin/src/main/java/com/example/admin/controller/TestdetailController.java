@@ -66,7 +66,10 @@ public class TestdetailController {
         return Result.success(userDetailInfoList);
     }
 
-
+    @RequestMapping("getItemDetail")
+    public Result getItemDetail(@RequestParam String detailId) {
+        return Result.success(testdetailService.getItemDetail(detailId));
+    }
 
 }
 

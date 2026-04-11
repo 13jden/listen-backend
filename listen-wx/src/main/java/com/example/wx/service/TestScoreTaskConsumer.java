@@ -36,12 +36,17 @@ public class TestScoreTaskConsumer {
     @Scheduled(fixedDelay = 500, timeUnit = java.util.concurrent.TimeUnit.MILLISECONDS)
     public void consumeTasks() {
         TestScoreTaskMessage message;
+        int count = 0;
         while ((message = redisComponent.rpopScoreTask()) != null) {
+            count++;
             try {
                 processTask(message);
             } catch (Exception e) {
                 log.error("处理评分任务失败: testDetailId={}, error={}", message.getTestDetailId(), e.getMessage(), e);
             }
+        }
+        if (count > 0) {
+            log.info("本轮消费 {} 条评分任务", count);
         }
     }
 
@@ -121,13 +126,20 @@ public class TestScoreTaskConsumer {
         }
 
         testdetail.setScore(finalScore);
+        testdetail.setTestTime(new Date());
+        testdetail.setSpeechDurationSec(msg.getUserDuration());
+        testdetail.setStandardDurationSec(msg.getStandardDuration());
         testdetail.setErrorPositions(errorPositions);
         testdetail.setErrorTags(errorTags);
         testdetail.setResultAnalysis(resultAnalysis);
         testdetail.setDurationScore(durationScore);
         testdetail.setEditDistanceScore(similarityScore);
         testdetail.setAiScore(aiRawScore);
-        testdetailMapper.updateById(testdetail);
+        testdetailMapper.updateByIdSelective(testdetail);
+        log.info("异步评分写入DB: testDetailId={}, finalScore={}, duration={}/{}, errorPositions={}, errorTags={}",
+                msg.getTestDetailId(), finalScore,
+                msg.getUserDuration(), msg.getStandardDuration(),
+                errorPositions, errorTags);
         redisComponent.deleteAudio(msg.getAudioId());
         redisComponent.deleteTestDetailCache(testdetail.getTestId());
 

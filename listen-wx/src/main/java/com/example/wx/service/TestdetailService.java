@@ -1,6 +1,7 @@
 package com.example.wx.service;
 
 import com.example.common.common.Result;
+import com.example.common.dto.ItemDetailInfo;
 import com.example.common.dto.UserDetailInfo;
 import com.example.wx.pojo.Testdetail;
 import com.baomidou.mybatisplus.extension.service.IService;
@@ -25,5 +26,7 @@ public interface TestdetailService extends IService<Testdetail> {
     Result getPreScore(MultipartFile testAudio);
 
     List<UserDetailInfo> getUserDetail(String testId);
+
+    ItemDetailInfo getItemDetail(String testDetailId);
 
 }

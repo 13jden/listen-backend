@@ -1,6 +1,5 @@
 package com.example.common.redis;
 
-
 import jakarta.annotation.Resource;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Component;
@@ -11,16 +10,11 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 @Component("redisUtils")
-public class RedisUtils<V> {
+public class RedisUtils {
 
     @Resource
-    private RedisTemplate<String, V> redisTemplate;
+    private RedisTemplate<String, Object> redisTemplate;
 
-    /**
-     * 删除缓存
-     *
-     * @param key 可以传一个值 或多个
-     */
     public void delete(String... key) {
         if (key != null && key.length > 0) {
             if (key.length == 1) {
@@ -31,18 +25,11 @@ public class RedisUtils<V> {
         }
     }
 
-    public V get(String key) {
+    public Object get(String key) {
         return key == null ? null : redisTemplate.opsForValue().get(key);
     }
 
-    /**
-     * 普通缓存放入
-     *
-     * @param key   键
-     * @param value 值
-     * @return true成功 false失败
-     */
-    public boolean set(String key, V value) {
+    public boolean set(String key, Object value) {
         try {
             redisTemplate.opsForValue().set(key, value);
             return true;
@@ -55,15 +42,7 @@ public class RedisUtils<V> {
         return redisTemplate.hasKey(key);
     }
 
-    /**
-     * 普通缓存放入并设置时间
-     *
-     * @param key   键
-     * @param value 值
-     * @param time  时间(秒) time要大于0 如果time小于等于0 将设置无限期
-     * @return true成功 false 失败
-     */
-    public boolean setex(String key, V value, long time) {
+    public boolean setex(String key, Object value, long time) {
         try {
             if (time > 0) {
                 redisTemplate.opsForValue().set(key, value, time, TimeUnit.MILLISECONDS);
@@ -88,13 +67,11 @@ public class RedisUtils<V> {
         }
     }
 
-
-    public List<V> getQueueList(String key) {
+    public List<Object> getQueueList(String key) {
         return redisTemplate.opsForList().range(key, 0, -1);
     }
 
-
-    public boolean lpush(String key, V value, Long time) {
+    public boolean lpush(String key, Object value, Long time) {
         try {
             redisTemplate.opsForList().leftPush(key, value);
             if (time != null && time > 0) {
@@ -117,7 +94,7 @@ public class RedisUtils<V> {
         }
     }
 
-    public boolean lpushAll(String key, List<V> values, long time) {
+    public boolean lpushAll(String key, List<Object> values, long time) {
         try {
             redisTemplate.opsForList().leftPushAll(key, values);
             if (time > 0) {
@@ -130,7 +107,7 @@ public class RedisUtils<V> {
         }
     }
 
-    public V rpop(String key) {
+    public Object rpop(String key) {
         try {
             return redisTemplate.opsForList().rightPop(key);
         } catch (Exception e) {
@@ -147,7 +124,6 @@ public class RedisUtils<V> {
     public Long incrementex(String key, long milliseconds) {
         Long count = redisTemplate.opsForValue().increment(key, 1);
         if (count == 1) {
-            //设置过期时间1天
             expire(key, milliseconds);
         }
         return count;
@@ -161,30 +137,26 @@ public class RedisUtils<V> {
         return count;
     }
 
-
     public Set<String> getByKeyPrefix(String keyPrifix) {
         Set<String> keyList = redisTemplate.keys(keyPrifix + "*");
         return keyList;
     }
 
-
-    public Map<String, V> getBatch(String keyPrifix) {
+    public Map<String, Object> getBatch(String keyPrifix) {
         Set<String> keySet = redisTemplate.keys(keyPrifix + "*");
         List<String> keyList = new ArrayList<>(keySet);
-        List<V> keyValueList = redisTemplate.opsForValue().multiGet(keyList);
-        Map<String, V> resultMap = keyList.stream().collect(Collectors.toMap(key -> key, value -> keyValueList.get(keyList.indexOf(value))));
+        List<Object> keyValueList = redisTemplate.opsForValue().multiGet(keyList);
+        Map<String, Object> resultMap = keyList.stream().collect(Collectors.toMap(key -> key, value -> keyValueList.get(keyList.indexOf(value))));
         return resultMap;
     }
 
-    public void zaddCount(String key, V v) {
+    public void zaddCount(String key, Object v) {
         redisTemplate.opsForZSet().incrementScore(key, v, 1);
     }
 
-
-    public List<V> getZSetList(String key, Integer count) {
-        Set<V> topElements = redisTemplate.opsForZSet().reverseRange(key, 0, count);
-        List<V> list = new ArrayList<>(topElements);
+    public List<Object> getZSetList(String key, Integer count) {
+        Set<Object> topElements = redisTemplate.opsForZSet().reverseRange(key, 0, count);
+        List<Object> list = new ArrayList<>(topElements);
         return list;
     }
-
 }
