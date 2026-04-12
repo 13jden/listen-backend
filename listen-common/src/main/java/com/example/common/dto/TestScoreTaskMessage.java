@@ -21,4 +21,8 @@ public class TestScoreTaskMessage implements Serializable {
     private String userAudioPath;
     private Float userDuration;
     private Float standardDuration;
+    /**
+     * 原始音频文件路径（转码前），不为空表示需要先进行音频处理
+     */
+    private String rawAudioPath;
 }

@@ -1,5 +1,6 @@
 package com.example.wx.service;
 
+import com.example.common.api.AliApi;
 import com.example.common.common.getHttpAudio;
 import com.example.common.dto.TestDto;
 import com.example.common.dto.TestScoreTaskMessage;
@@ -13,10 +14,13 @@ import com.example.wx.pojo.Audio;
 import com.example.wx.pojo.Testdetail;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
+import javax.sound.sampled.*;
 import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
@@ -32,6 +36,10 @@ public class TestScoreTaskConsumer {
     private final ElasticsearchSyncService elasticsearchSyncService;
     private final AIEvaluationService aiEvaluationService;
     private final RedisComponent redisComponent;
+    private final AliApi aliApi;
+
+    @Value("${ffmpeg.path}")
+    private String ffmpegPath;
 
     @Scheduled(fixedDelay = 500, timeUnit = java.util.concurrent.TimeUnit.MILLISECONDS)
     public void consumeTasks() {
@@ -51,6 +59,17 @@ public class TestScoreTaskConsumer {
     }
 
     private void processTask(TestScoreTaskMessage msg) {
+        // 1. 如果有 rawAudioPath，说明需要先处理音频（转码 + ASR）
+        if (msg.getRawAudioPath() != null && !msg.getRawAudioPath().isEmpty()) {
+            processAudioAndUpdateMessage(msg);
+        }
+
+        // 2. 如果没有识别结果，说明音频处理失败了，跳过
+        if (msg.getUserContent() == null || msg.getUserContent().trim().isEmpty()) {
+            log.warn("用户识别内容为空，跳过评分: testDetailId={}", msg.getTestDetailId());
+            return;
+        }
+
         Testdetail testdetail = testdetailMapper.selectById(msg.getTestDetailId());
         if (testdetail == null) {
             log.warn("测试详情不存在: {}", msg.getTestDetailId());
@@ -249,5 +268,81 @@ public class TestScoreTaskConsumer {
             if (text.indexOf(c) >= 0) return true;
         }
         return false;
+    }
+
+    /**
+     * 处理音频：ffmpeg转码 → ASR转文字 → 更新消息内容
+     */
+    private void processAudioAndUpdateMessage(TestScoreTaskMessage msg) {
+        String rawPath = msg.getRawAudioPath();
+        String processedPath = msg.getUserAudioPath();
+        log.info("开始异步处理音频: testDetailId={}, raw={}, processed={}", msg.getTestDetailId(), rawPath, processedPath);
+
+        // 1. ffmpeg 转码
+        try {
+            modifyAudioSampleRate(rawPath, processedPath);
+        } catch (IOException e) {
+            log.error("ffmpeg转码失败: testDetailId={}", msg.getTestDetailId(), e);
+            return;
+        }
+        new File(rawPath).delete();
+
+        // 2. ASR 转文字
+        String userContent = aliApi.getString(processedPath);
+        if (userContent == null || userContent.trim().isEmpty()) {
+            log.warn("ASR识别结果为空，跳过: testDetailId={}", msg.getTestDetailId());
+            return;
+        }
+
+        // 3. 更新消息内容
+        msg.setUserContent(userContent);
+        float userDuration = getAudioDuration(processedPath);
+        msg.setUserDuration(userDuration);
+
+        // 4. 更新数据库（识别结果）
+        Testdetail testdetail = testdetailMapper.selectById(msg.getTestDetailId());
+        if (testdetail != null) {
+            testdetail.setUserAudioPath(processedPath);
+            testdetail.setUserContent(userContent);
+            testdetail.setSpeechDurationSec(userDuration);
+            if (msg.getStandardDuration() != null) {
+                testdetail.setStandardDurationSec(msg.getStandardDuration());
+            }
+            testdetail.setTestTime(new Date());
+            testdetailMapper.updateByIdSelective(testdetail);
+            redisComponent.deleteTestDetailCache(testdetail.getTestId());
+            redisComponent.deleteAudio(msg.getAudioId());
+        }
+
+        log.info("音频处理完成: testDetailId={}, userContent={}, duration={}s", msg.getTestDetailId(), userContent, userDuration);
+    }
+
+    private float getAudioDuration(String filePath) {
+        try {
+            File wavFile = new File(filePath);
+            AudioInputStream audioInputStream = AudioSystem.getAudioInputStream(wavFile);
+            AudioFormat format = audioInputStream.getFormat();
+            long frames = audioInputStream.getFrameLength();
+            float frameRate = format.getFrameRate();
+            double durationInSeconds = frames / frameRate;
+            audioInputStream.close();
+            return (float) durationInSeconds;
+        } catch (Exception e) {
+            log.warn("获取音频时长失败: {}", e.getMessage());
+            return 0f;
+        }
+    }
+
+    private void modifyAudioSampleRate(String inputFilePath, String outputFilePath) throws IOException {
+        String command = ffmpegPath + " -i " + inputFilePath + " -ar 16000 -ac 1 -sample_fmt s16 -b:a 256k " + outputFilePath;
+        Process process = Runtime.getRuntime().exec(command);
+        try {
+            int exitCode = process.waitFor();
+            if (exitCode != 0) {
+                throw new IOException("FFmpeg命令执行失败，退出码：" + exitCode);
+            }
+        } catch (InterruptedException e) {
+            throw new IOException("FFmpeg命令执行被中断", e);
+        }
     }
 }

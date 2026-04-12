@@ -86,16 +86,13 @@ public class TestdetailServiceImpl extends ServiceImpl<TestdetailMapper, Testdet
     }
 
     /**
-    * 保存音频到usertest.getTestFilePath(),调阿里api语音转文字,把返回的文字存进数据库
-    * */
+     * 保存音频文件并发送异步处理消息，立即返回
+     */
     @Override
     public Result OneUserAudioUpload(MultipartFile testAudio, String testDetailId) throws Exception {
         Testdetail testdetail = testdetailMapper.selectById(testDetailId);
         if (testdetail == null) {
             throw new RuntimeException("测试详情不存在");
-        }
-        if (testdetail.getUserAudioPath() != null) {
-            new File(testdetail.getUserAudioPath()).delete();
         }
 
         Usertest usertest = usertestMapper.selectById(testdetail.getTestId());
@@ -115,76 +112,34 @@ public class TestdetailServiceImpl extends ServiceImpl<TestdetailMapper, Testdet
         String tempPath = usertest.getTestFilePath() + "/" + tempName;
         String fullPath = usertest.getTestFilePath() + "/" + fileName;
 
+        // 删除旧的用户音频文件
+        if (testdetail.getUserAudioPath() != null) {
+            new File(testdetail.getUserAudioPath()).delete();
+        }
+
         File targetFile = new File(tempPath);
         if (!targetFile.getParentFile().exists()) {
             targetFile.getParentFile().mkdirs();
         }
         testAudio.transferTo(targetFile);
 
-        try {
-            modifyAudioSampleRate(tempPath, fullPath);
-        } catch (IOException e) {
-            return Result.error("修改音频采样频率失败");
-        }
-        targetFile.delete();
-
-        String userContent = aliApi.getString(fullPath);
-        String audioContent = audio.getContent();
-        boolean isEmptyRecognition = (userContent == null || userContent.trim().isEmpty());
-
-        float userDuration = getAudioDuration(fullPath);
-        float standardDuration = audio.getDurationSec() != null ? audio.getDurationSec() : 0f;
-
-        if (isEmptyRecognition) {
-            return Result.error("语音识别为空，请重试");
-        }
-
-        float editDistanceScore = calculateEditDistanceScore(userContent, audioContent);
-
-        if (editDistanceScore == 0f) {
-            testdetail.setUserAudioPath(fullPath);
-            testdetail.setUserContent(userContent);
-            testdetail.setTestTime(new Date());
-            testdetail.setScore(0f);
-            testdetail.setSpeechDurationSec(userDuration);
-            testdetail.setStandardDurationSec(standardDuration);
-            testdetail.setDurationScore(0f);
-            testdetail.setEditDistanceScore(0f);
-            testdetail.setAiScore(0f);
-            testdetailMapper.updateById(testdetail);
-            redisComponent.deleteTestDetailCache(testdetail.getTestId());
-            redisComponent.deleteAudio(audio.getId());
-
-            TestDto testDto = CopyTools.copy(testdetail, TestDto.class);
-            testDto.setAudioPath(getHttpAudio.getAudioUrl(audio.getPath()));
-            testDto.setTestAudioPath(getHttpAudio.getAudioUrl(fullPath));
-            return Result.success(testDto);
-        }
-
-        testdetail.setUserAudioPath(fullPath);
-        testdetail.setUserContent(userContent);
-        testdetail.setSpeechDurationSec(userDuration);
-        testdetail.setStandardDurationSec(standardDuration);
-        testdetailMapper.updateByIdSelective(testdetail);
-        redisComponent.deleteTestDetailCache(testdetail.getTestId());
-        redisComponent.deleteAudio(audio.getId());
-
+        // 发消息给消费者：消费者处理 ffmpeg转码 + ASR + 评分
         TestScoreTaskMessage message = TestScoreTaskMessage.builder()
                 .testDetailId(testDetailId)
-                .userContent(userContent)
-                .audioContent(audioContent)
-                .audioId(audio.getId())
+                .rawAudioPath(tempPath)
                 .userAudioPath(fullPath)
-                .userDuration(userDuration)
-                .standardDuration(standardDuration)
+                .audioContent(audio.getContent())
+                .audioId(audio.getId())
+                .standardDuration(audio.getDurationSec())
                 .build();
         redisComponent.lpushScoreTask(message);
-        log.info("消息入队，等待异步处理");
-        // 先返回基础信息（score 等消费端异步写入）
+        log.info("消息入队，等待异步处理: testDetailId={}", testDetailId);
+
+        // 立即返回，前端可轮询或等待推送
         TestDto testDto = CopyTools.copy(testdetail, TestDto.class);
         testDto.setAudioPath(getHttpAudio.getAudioUrl(audio.getPath()));
         testDto.setTestAudioPath(getHttpAudio.getAudioUrl(fullPath));
-        // 正在评分中，前端可轮询或等待 WebSocket 推送更新
+        testDto.setScore(null); // 评分异步进行
         return Result.success(testDto);
     }
 
