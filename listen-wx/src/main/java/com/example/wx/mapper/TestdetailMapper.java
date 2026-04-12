@@ -27,29 +27,41 @@ public interface TestdetailMapper extends BaseMapper<Testdetail> {
     void insertTestDetail(Testdetail testDetail);
 
     // 根据 testId 查询 Testdetail 列表，避免冲突，反引号包裹字段
-    @Select("SELECT id, test_id, audio_id, user_audio_path, `index`, score, user_content, test_time " +
+    @Select("SELECT id, test_id, audio_id, user_audio_path, `index`, score, user_content, test_time, " +
+            "error_positions, error_tags, result_analysis, speech_duration_sec, standard_duration_sec, " +
+            "duration_score, edit_distance_score, ai_score " +
             "FROM testdetail WHERE test_id = #{testId} " +
             "ORDER BY `index` ASC")
     List<Testdetail> selectListByTestId(String testId);
 
-    @Select("SELECT id, test_id, audio_id, user_audio_path, `index`, score, user_content, test_time " +
+    @Select("SELECT id, test_id, audio_id, user_audio_path, `index`, score, user_content, test_time, " +
+            "error_positions, error_tags, result_analysis, speech_duration_sec, standard_duration_sec, " +
+            "duration_score, edit_distance_score, ai_score " +
             "FROM testdetail WHERE id = #{testDetailId}")
     Testdetail selectById(String testDetailId);
 
 
 
-    @Select("SELECT * FROM testdetail WHERE test_id = #{testId}"+
+    @Select("SELECT id, test_id, audio_id, user_audio_path, `index`, score, user_content, test_time, " +
+            "error_positions, error_tags, result_analysis, speech_duration_sec, standard_duration_sec, " +
+            "duration_score, edit_distance_score, ai_score " +
+            "FROM testdetail WHERE test_id = #{testId} " +
             "ORDER BY `index` ASC")
     List<Testdetail> selectByTestId(String testId);
 
     /**
      * 根据日期范围查询测试详情
      */
-    @Select("SELECT id, test_id, audio_id, user_audio_path, `index`, score, user_content, test_time " +
+    @Select("SELECT id, test_id, audio_id, user_audio_path, `index`, score, user_content, test_time, " +
+            "error_positions, error_tags, result_analysis, speech_duration_sec, standard_duration_sec, " +
+            "duration_score, edit_distance_score, ai_score " +
             "FROM testdetail WHERE test_time >= #{startDate} AND test_time < #{endDate}")
     List<Testdetail> selectListByDate(Date startDate, Date endDate);
 
-    @Select("SELECT id, test_id, audio_id, user_audio_path, `index`, score, user_content, test_time FROM testdetail")
+    @Select("SELECT id, test_id, audio_id, user_audio_path, `index`, score, user_content, test_time, " +
+            "error_positions, error_tags, result_analysis, speech_duration_sec, standard_duration_sec, " +
+            "duration_score, edit_distance_score, ai_score " +
+            "FROM testdetail")
     List<Testdetail> selectList();
 
     @Update({"<script>",

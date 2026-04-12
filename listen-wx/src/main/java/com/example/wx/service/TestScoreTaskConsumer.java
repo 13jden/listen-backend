@@ -64,21 +64,21 @@ public class TestScoreTaskConsumer {
         float similarityScore = calculateEditDistanceScore(userContent, audioContent);
 
         AIEvaluationService.AIEvaluationResult aiResult = null;
-        try {
-            aiResult = aiEvaluationService.evaluate(userContent, audioContent);
-        } catch (Exception e) {
-            log.warn("AI评分调用失败: {}", e.getMessage());
+        if (similarityScore < 100f) {
+            try {
+                aiResult = aiEvaluationService.evaluate(userContent, audioContent);
+            } catch (Exception e) {
+                log.warn("AI评分调用失败: {}", e.getMessage());
+            }
         }
 
-        /*
-         * 相似度 100%：总分 100，不调 AI（evaluate 内已短路）。
-         * 否则：总分 = 文本相似度×0.5 + AI 返回 score×0.3 + 时长得分×0.2；AI 未返回 score 时用相似度兜底 0.3 项。
-         */
-        float finalScore = 0f;
+        float finalScore;
         float aiRawScore = 0f;
         if (similarityScore >= 100f) {
+            // 编辑距离满分时，所有得分都直接满分，不调 AI
             finalScore = 100f;
             aiRawScore = 100f;
+            durationScore = 100f;
         } else {
             float aiRaw;
             if (aiResult != null && aiResult.isAiRawScorePresent()) {

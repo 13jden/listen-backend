@@ -2,9 +2,14 @@ package com.example.admin.controller;
 
 
 import com.example.common.common.Result;
+import com.example.wx.pojo.UserPhaseReport;
 import com.example.wx.service.AudioService;
+import com.example.wx.service.UserPhaseReportService;
 import com.example.wx.service.UsertestService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 
 import org.springframework.web.bind.annotation.RequestParam;

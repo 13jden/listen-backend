@@ -26,13 +26,13 @@ import java.util.regex.Pattern;
 @Service
 public class AIEvaluationService {
 
-    @Value("${aliyun.test.app-id:}")
+    @Value("${aliyun.test-eval.app-id:}")
     private String appId;
 
-    @Value("${aliyun.test.api-key:}")
+    @Value("${aliyun.test-eval.api-key:}")
     private String apiKey;
 
-    @Value("${aliyun.test.work.space.id:}")
+    @Value("${aliyun.test-eval.workspace-id:}")
     private String workspaceId;
 
     @Autowired

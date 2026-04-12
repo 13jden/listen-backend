@@ -24,23 +24,23 @@ import java.util.Map;
 @Service
 public class AIAnalysisService {
 
-    @Value("${aliyun.analysis.app-id:}")
+    @Value("${aliyun.test-analysis.app-id:}")
     private String analysisAppId;
 
-    @Value("${aliyun.analysis.api-key:}")
+    @Value("${aliyun.test-analysis.api-key:}")
     private String analysisApiKey;
 
-    @Value("${aliyun.analysis.workspace-id:}")
+    @Value("${aliyun.test-analysis.workspace-id:}")
     private String analysisWorkspaceId;
 
-    @Value("${aliyun.test.app-id:}")
-    private String testAppId;
+    @Value("${aliyun.test-eval.app-id:}")
+    private String testEvalAppId;
 
-    @Value("${aliyun.test.api-key:}")
-    private String testApiKey;
+    @Value("${aliyun.test-eval.api-key:}")
+    private String testEvalApiKey;
 
-    @Value("${aliyun.test.work.space.id:}")
-    private String testWorkspaceId;
+    @Value("${aliyun.test-eval.workspace-id:}")
+    private String testEvalWorkspaceId;
 
     @Autowired
     private ElasticsearchAggregationService aggregationService;
@@ -252,8 +252,8 @@ public class AIAnalysisService {
     private String callAI(String prompt) {
         try {
             // 使用分析专用应用
-            String appId = !analysisAppId.isEmpty() ? analysisAppId : testAppId;
-            String apiKeyValue = !analysisApiKey.isEmpty() ? analysisApiKey : testApiKey;
+            String appId = analysisAppId;
+            String apiKeyValue = analysisApiKey;
 
             if (appId.isEmpty() || apiKeyValue.isEmpty()) {
                 log.warn("AI分析配置不完整，跳过AI调用");

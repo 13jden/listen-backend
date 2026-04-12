@@ -20,6 +20,7 @@ import com.example.wx.pojo.User;
 import com.example.wx.pojo.Usertest;
 import com.example.wx.mapper.UsertestMapper;
 import com.example.wx.service.UsertestService;
+import com.example.wx.service.UserTestReportService;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -63,6 +64,9 @@ public class UsertestServiceImpl extends ServiceImpl<UsertestMapper, Usertest> i
 
     @Autowired
     private RedisComponent redisComponent;
+
+    @Autowired
+    private UserTestReportService userTestReportService;
 
     @Value("${userFile.path}")
     private String userPath;
@@ -234,6 +238,16 @@ public class UsertestServiceImpl extends ServiceImpl<UsertestMapper, Usertest> i
 
         // 同步到ES
         elasticsearchSyncService.syncTestToEs(testId);
+
+        // 等待3秒，确保之前的异步评分任务完成
+        try {
+            Thread.sleep(3000);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+
+        // 生成AI报告
+        userTestReportService.generateAndSaveReport(testId);
 
         return usertest;
     }
