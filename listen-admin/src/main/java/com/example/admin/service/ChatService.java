@@ -131,7 +131,8 @@ public class ChatService {
                     })
                     .filter(s -> s != null && !s.isEmpty())
                     .doOnError(error -> System.err.println("流处理错误: " + error.getMessage()))
-                    .doOnComplete(() -> System.out.println("流处理完成"));
+                    .doOnComplete(() -> System.out.println("流处理完成"))
+                    .concatWith(Flux.just("[DONE]"));
         } catch (Exception e) {
             System.err.println("streamChat 方法异常: " + e.getMessage());
             e.printStackTrace();
@@ -140,55 +141,29 @@ public class ChatService {
     }
 
     /**
-     * 如果 testInfo 中的关键字段为空，根据 userId 或 testId 查询数据库补全
+     * 每次都根据 userId 查询用户的最新测试记录，覆盖前端传入的 testInfo
      */
     private void enrichTestInfo(ChatRequest request) {
-        List<ChatRequest.TestInfo> testInfoList = request.getTestInfo();
-        if (testInfoList == null || testInfoList.isEmpty()) {
-            String userId = extractUserId(request);
-            if (userId != null) {
+        String userId = extractUserId(request);
+        if (userId == null || userId.isEmpty()) {
+            return;
+        }
+
+        List<ChatRequest.TestInfo> testInfoList = new ArrayList<>();
+        try {
+            SimpleDateFormat sdf = new SimpleDateFormat("yyyy年MM月dd日 HH:mm");
+            Usertest latestTest = usertestMapper.getLatestTestByUserId(userId);
+            if (latestTest != null) {
                 ChatRequest.TestInfo testInfo = new ChatRequest.TestInfo();
                 testInfo.setUserId(userId);
-                request.setTestInfo(List.of(testInfo));
-            }
-            return;
-        }
-
-        // 遍历 testInfo 列表，逐个补全
-        for (ChatRequest.TestInfo testInfo : testInfoList) {
-            enrichSingleTestInfo(testInfo);
-        }
-    }
-
-    /**
-     * 补全单个 TestInfo 的字段
-     */
-    private void enrichSingleTestInfo(ChatRequest.TestInfo testInfo) {
-        if (testInfo == null) {
-            return;
-        }
-
-        SimpleDateFormat sdf = new SimpleDateFormat("yyyy年MM月dd日 HH:mm");
-        String testId = testInfo.getTestId();
-        String userId = testInfo.getUserId();
-
-        try {
-            // 优先用 testId 精确查询
-            if (testId != null && !testId.isEmpty()) {
-                Usertest usertest = usertestMapper.selectById(testId);
-                if (usertest != null) {
-                    fillTestInfo(testInfo, usertest, sdf);
-                }
-            } else if (userId != null && !userId.isEmpty()) {
-                // 用 userId 查最新一次测试
-                Usertest latestTest = usertestMapper.getLatestTestByUserId(userId);
-                if (latestTest != null) {
-                    fillTestInfo(testInfo, latestTest, sdf);
-                }
+                fillTestInfo(testInfo, latestTest, sdf);
+                testInfoList.add(testInfo);
             }
         } catch (Exception e) {
-            log.warn("补全测试信息失败: {}", e.getMessage());
+            log.warn("查询用户最新测试记录失败: {}", e.getMessage());
         }
+
+        request.setTestInfo(testInfoList.isEmpty() ? null : testInfoList);
     }
 
     private void fillTestInfo(ChatRequest.TestInfo testInfo, Usertest usertest, SimpleDateFormat sdf) {

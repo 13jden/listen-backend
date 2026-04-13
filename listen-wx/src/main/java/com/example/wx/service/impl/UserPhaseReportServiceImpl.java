@@ -7,13 +7,16 @@ import com.alibaba.dashscope.exception.InputRequiredException;
 import com.alibaba.dashscope.exception.NoApiKeyException;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.example.common.utils.StringTools;
+import com.example.wx.mapper.AudioMapper;
+import com.example.wx.mapper.TestdetailMapper;
 import com.example.wx.mapper.UsertestMapper;
 import com.example.wx.mapper.UserPhaseReportMapper;
+import com.example.wx.pojo.Audio;
+import com.example.wx.pojo.Testdetail;
 import com.example.wx.pojo.UserPhaseReport;
 import com.example.wx.pojo.Usertest;
 import com.example.wx.service.UserPhaseReportService;
 import com.google.gson.Gson;
-import com.google.gson.JsonObject;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -35,6 +38,12 @@ public class UserPhaseReportServiceImpl implements UserPhaseReportService {
 
     @Autowired
     private UsertestMapper usertestMapper;
+
+    @Autowired
+    private TestdetailMapper testdetailMapper;
+
+    @Autowired
+    private AudioMapper audioMapper;
 
     @Value("${aliyun.phase-analysis.app-id:}")
     private String analysisAppId;
@@ -79,10 +88,74 @@ public class UserPhaseReportServiceImpl implements UserPhaseReportService {
         Collections.reverse(scoreTrend);
         String scoreTrendJson = gson.toJson(scoreTrend);
 
-        // 3. 调用AI生成分析
+        // 3. 调用AI生成分析并解析
         String testAnalysis = "";
         try {
-            testAnalysis = callAIForAnalysis(userId, testList);
+            String aiResponse = callAIForAnalysis(userId, testList);
+            if (aiResponse == null || aiResponse.trim().isEmpty()) {
+                log.warn("AI返回为空，跳过解析");
+            } else {
+                // 去掉 markdown 代码块包裹
+                String jsonStr = aiResponse.trim();
+                if (jsonStr.startsWith("```json")) {
+                    jsonStr = jsonStr.substring(7);
+                } else if (jsonStr.startsWith("```")) {
+                    jsonStr = jsonStr.substring(3);
+                }
+                if (jsonStr.endsWith("```")) {
+                    jsonStr = jsonStr.substring(0, jsonStr.length() - 3);
+                }
+                jsonStr = jsonStr.trim();
+                if (jsonStr.isEmpty()) {
+                    log.warn("AI返回内容为空字符串");
+                } else {
+                    try {
+                        com.google.gson.JsonObject parsed = gson.fromJson(jsonStr, com.google.gson.JsonObject.class);
+                        if (parsed != null) {
+                            String evaluation = "";
+                            String suggestion = "";
+
+                            // 优先尝试顶层结构：{"evaluation":"...","suggestion":"..."}
+                            if (parsed.has("evaluation")) {
+                                evaluation = parsed.get("evaluation").getAsString();
+                            } else if (parsed.has("analysis")) {
+                                // 其次尝试 analysis 字段（可能是字符串，也可能是嵌套对象）
+                                com.google.gson.JsonElement analysisElem = parsed.get("analysis");
+                                if (analysisElem.isJsonObject()) {
+                                    com.google.gson.JsonObject analysisObj = analysisElem.getAsJsonObject();
+                                    evaluation = analysisObj.has("evaluation") ? analysisObj.get("evaluation").getAsString() : "";
+                                } else {
+                                    evaluation = analysisElem.getAsString();
+                                }
+                            }
+
+                            if (parsed.has("suggestion")) {
+                                com.google.gson.JsonElement sugElem = parsed.get("suggestion");
+                                if (parsed.has("evaluation") && sugElem.isJsonObject()) {
+                                    // suggestion 也在 analysis 里
+                                    suggestion = sugElem.getAsJsonObject().has("suggestion")
+                                            ? sugElem.getAsJsonObject().get("suggestion").getAsString() : "";
+                                } else {
+                                    suggestion = sugElem.getAsString();
+                                }
+                            }
+
+                            StringBuilder sb = new StringBuilder();
+                            if (!evaluation.isEmpty()) sb.append("评价：").append(evaluation);
+                            if (!suggestion.isEmpty()) {
+                                if (sb.length() > 0) sb.append("\n");
+                                sb.append("建议：").append(suggestion);
+                            }
+                            testAnalysis = sb.length() > 0 ? sb.toString() : aiResponse;
+                        } else {
+                            testAnalysis = aiResponse;
+                        }
+                    } catch (Exception e) {
+                        log.warn("JSON解析失败，保存原始内容: {}", e.getMessage());
+                        testAnalysis = aiResponse;
+                    }
+                }
+            }
         } catch (Exception e) {
             log.warn("AI分析生成失败: {}", e.getMessage());
         }
@@ -145,24 +218,34 @@ public class UserPhaseReportServiceImpl implements UserPhaseReportService {
                 return "";
             }
 
-            // 构建测试历史数据
+            // 构建完整测试数据（含每段testdetail）
             List<Map<String, Object>> testHistory = new ArrayList<>();
             for (Usertest test : testList) {
+                List<Testdetail> details = testdetailMapper.selectListByTestId(test.getId());
+                List<Map<String, Object>> detailItems = new ArrayList<>();
+                for (Testdetail td : details) {
+                    Audio audio = audioMapper.selectById(td.getAudioId());
+                    Map<String, Object> d = new HashMap<>();
+                    d.put("index", td.getIndex());
+                    d.put("standardContent", audio != null ? audio.getContent() : "");
+                    d.put("userContent", td.getUserContent() != null ? td.getUserContent() : "");
+                    d.put("score", td.getScore() != null ? td.getScore() : 0);
+                    d.put("errorTags", td.getErrorTags() != null ? Arrays.asList(td.getErrorTags().split(",")) : new ArrayList<>());
+                    d.put("resultAnalysis", td.getResultAnalysis() != null ? td.getResultAnalysis() : "");
+                    detailItems.add(d);
+                }
                 Map<String, Object> item = new HashMap<>();
                 item.put("testTime", test.getEndTime() != null ? test.getEndTime().toString() : "");
                 item.put("score", test.getAvgScore() != 0 ? test.getAvgScore() : 0);
+                item.put("details", detailItems);
                 testHistory.add(item);
             }
-
-            // 构建bizParams
-            JsonObject bizParams = new JsonObject();
-            bizParams.addProperty("data", gson.toJson(testHistory));
+            String testDataJson = gson.toJson(testHistory);
 
             ApplicationParam param = ApplicationParam.builder()
                     .apiKey(analysisApiKey)
                     .appId(analysisAppId)
-                    .prompt("请根据用户测试历史数据生成JSON格式的分析")
-                    .bizParams(bizParams)
+                    .prompt("请根据以下用户测试历史数据，生成一段简洁的分析报告，直接返回JSON格式，结构为{\"evaluation\":\"整体评价文字\",\"suggestion\":\"建议文字\"}，不要用markdown包裹，不要嵌套，不要代码块。数据：" + testDataJson)
                     .incrementalOutput(false)
                     .hasThoughts(false)
                     .build();
@@ -183,22 +266,35 @@ public class UserPhaseReportServiceImpl implements UserPhaseReportService {
 
     private String extractResult(ApplicationResult result) {
         try {
-            if (result == null) return "";
+            if (result == null) {
+                log.warn("AI result is null");
+                return "";
+            }
             Object output = result.getOutput();
-            if (output == null) return "";
+            if (output == null) {
+                log.warn("AI result output is null");
+                return "";
+            }
 
             try {
                 java.lang.reflect.Method getTextMethod = output.getClass().getMethod("getText");
                 Object textObj = getTextMethod.invoke(output);
-                if (textObj != null && !textObj.toString().isEmpty()) {
-                    return textObj.toString();
+                if (textObj != null && !textObj.toString().trim().isEmpty()) {
+                    String text = textObj.toString();
+                    log.info("AI返回内容: {}", text);
+                    return text;
                 }
             } catch (NoSuchMethodException e) {
                 // ignore
             }
 
             String str = output.toString();
-            return (str != null && !str.isEmpty()) ? str : "";
+            if (str != null && !str.trim().isEmpty()) {
+                log.info("AI返回内容(toString): {}", str);
+                return str;
+            }
+            log.warn("AI返回内容为空");
+            return "";
         } catch (Exception e) {
             log.error("提取AI结果失败: {}", e.getMessage());
             return "";

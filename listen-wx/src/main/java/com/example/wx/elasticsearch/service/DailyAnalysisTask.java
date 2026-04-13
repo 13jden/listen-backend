@@ -41,6 +41,12 @@ public class DailyAnalysisTask {
 
     private static final String DAILY_STATS_KEY = "listen:daily:stats:";
     private static final String MONTHLY_REPORT_KEY = "listen:monthly:report:";
+    private static final String MONTHLY_TREND_KEY = "listen:monthly:trend";
+    private static final String AGE_DISTRIBUTION_KEY = "listen:age:distribution";
+    private static final String COMPLETION_STATUS_KEY = "listen:completion:status";
+    private static final String ERROR_TYPE_KEY = "listen:error:type:distribution";
+    private static final String HOSPITAL_STATS_KEY = "listen:hospital:stats";
+    private static final String SCORE_DISTRIBUTION_KEY = "listen:score:distribution";
 
     /**
      * 每日凌晨2点执行：更新Redis缓存数据
@@ -188,13 +194,23 @@ public class DailyAnalysisTask {
      * 更新每日统计数据到Redis
      */
     public void updateDailyStatsToRedis(String date) {
+        updateDailyStatsToRedis(date, null);
+    }
+
+    /**
+     * 更新每日统计数据到Redis（可传入已查询的结果避免重复查询）
+     */
+    public void updateDailyStatsToRedis(String date, DailyReportVO preFetchedVO) {
         if (redisTemplate == null) {
             log.warn("Redis未配置，跳过每日统计更新");
             return;
         }
 
         try {
-            DailyReportVO dailyReport = aggregationService.getDailyReport(date, date);
+            DailyReportVO dailyReport = preFetchedVO;
+            if (dailyReport == null) {
+                dailyReport = aggregationService.getDailyReport(date, date);
+            }
 
             Map<String, String> stats = new HashMap<>();
             stats.put("date", date);
@@ -373,5 +389,246 @@ public class DailyAnalysisTask {
         } catch (Exception e) {
             log.error("手动生成月度报告失败", e);
         }
+    }
+
+    /**
+     * 保存总计统计数据到Redis（传入已构建的VO）
+     */
+    public boolean updateSummaryStatsToRedis(SummaryStatsVO vo) {
+        if (redisTemplate == null || vo == null) {
+            return false;
+        }
+        try {
+            String summaryJson = new com.google.gson.Gson().toJson(vo);
+            redisTemplate.opsForValue().set("listen:summary:stats", summaryJson);
+            redisTemplate.expire("listen:summary:stats", Duration.ofHours(24));
+            log.info("总计统计数据已保存到Redis");
+            return true;
+        } catch (Exception e) {
+            log.error("保存总计统计数据到Redis失败", e);
+            return false;
+        }
+    }
+
+    /**
+     * 保存月度趋势数据到Redis
+     */
+    public boolean updateMonthlyTrendToRedis(MonthlyTrendVO vo) {
+        if (redisTemplate == null || vo == null) {
+            return false;
+        }
+        try {
+            String json = new com.google.gson.Gson().toJson(vo);
+            redisTemplate.opsForValue().set(MONTHLY_TREND_KEY, json);
+            redisTemplate.expire(MONTHLY_TREND_KEY, Duration.ofDays(30));
+            log.info("月度趋势数据已保存到Redis");
+            return true;
+        } catch (Exception e) {
+            log.error("保存月度趋势数据到Redis失败", e);
+            return false;
+        }
+    }
+
+    /**
+     * 获取月度趋势数据
+     */
+    public MonthlyTrendVO getMonthlyTrendFromRedis() {
+        if (redisTemplate == null) {
+            return null;
+        }
+        try {
+            Object data = redisTemplate.opsForValue().get(MONTHLY_TREND_KEY);
+            if (data != null) {
+                return new com.google.gson.Gson().fromJson(data.toString(), MonthlyTrendVO.class);
+            }
+        } catch (Exception e) {
+            log.error("获取月度趋势数据失败", e);
+        }
+        return null;
+    }
+
+    /**
+     * 保存年龄分布数据到Redis
+     */
+    public boolean updateAgeDistributionToRedis(AgeGroupDistributionVO vo) {
+        if (redisTemplate == null || vo == null) {
+            return false;
+        }
+        try {
+            String json = new com.google.gson.Gson().toJson(vo);
+            redisTemplate.opsForValue().set(AGE_DISTRIBUTION_KEY, json);
+            redisTemplate.expire(AGE_DISTRIBUTION_KEY, Duration.ofDays(30));
+            log.info("年龄分布数据已保存到Redis");
+            return true;
+        } catch (Exception e) {
+            log.error("保存年龄分布数据到Redis失败", e);
+            return false;
+        }
+    }
+
+    /**
+     * 获取年龄分布数据
+     */
+    public AgeGroupDistributionVO getAgeDistributionFromRedis() {
+        if (redisTemplate == null) {
+            return null;
+        }
+        try {
+            Object data = redisTemplate.opsForValue().get(AGE_DISTRIBUTION_KEY);
+            if (data != null) {
+                return new com.google.gson.Gson().fromJson(data.toString(), AgeGroupDistributionVO.class);
+            }
+        } catch (Exception e) {
+            log.error("获取年龄分布数据失败", e);
+        }
+        return null;
+    }
+
+    /**
+     * 保存完成状态数据到Redis
+     */
+    public boolean updateCompletionStatusToRedis(CompletionStatusVO vo) {
+        if (redisTemplate == null || vo == null) {
+            return false;
+        }
+        try {
+            String json = new com.google.gson.Gson().toJson(vo);
+            redisTemplate.opsForValue().set(COMPLETION_STATUS_KEY, json);
+            redisTemplate.expire(COMPLETION_STATUS_KEY, Duration.ofDays(30));
+            log.info("完成状态数据已保存到Redis");
+            return true;
+        } catch (Exception e) {
+            log.error("保存完成状态数据到Redis失败", e);
+            return false;
+        }
+    }
+
+    /**
+     * 获取完成状态数据
+     */
+    public CompletionStatusVO getCompletionStatusFromRedis() {
+        if (redisTemplate == null) {
+            return null;
+        }
+        try {
+            Object data = redisTemplate.opsForValue().get(COMPLETION_STATUS_KEY);
+            if (data != null) {
+                return new com.google.gson.Gson().fromJson(data.toString(), CompletionStatusVO.class);
+            }
+        } catch (Exception e) {
+            log.error("获取完成状态数据失败", e);
+        }
+        return null;
+    }
+
+    /**
+     * 保存错误类型分布数据到Redis
+     */
+    public boolean updateErrorTypeDistributionToRedis(ErrorTypeDistributionVO vo) {
+        if (redisTemplate == null || vo == null) {
+            return false;
+        }
+        try {
+            String json = new com.google.gson.Gson().toJson(vo);
+            redisTemplate.opsForValue().set(ERROR_TYPE_KEY, json);
+            redisTemplate.expire(ERROR_TYPE_KEY, Duration.ofDays(30));
+            log.info("错误类型分布数据已保存到Redis");
+            return true;
+        } catch (Exception e) {
+            log.error("保存错误类型分布数据到Redis失败", e);
+            return false;
+        }
+    }
+
+    /**
+     * 获取错误类型分布数据
+     */
+    public ErrorTypeDistributionVO getErrorTypeDistributionFromRedis() {
+        if (redisTemplate == null) {
+            return null;
+        }
+        try {
+            Object data = redisTemplate.opsForValue().get(ERROR_TYPE_KEY);
+            if (data != null) {
+                return new com.google.gson.Gson().fromJson(data.toString(), ErrorTypeDistributionVO.class);
+            }
+        } catch (Exception e) {
+            log.error("获取错误类型分布数据失败", e);
+        }
+        return null;
+    }
+
+    /**
+     * 保存医院统计数据到Redis
+     */
+    public boolean updateHospitalStatsToRedis(HospitalStatsVO vo) {
+        if (redisTemplate == null || vo == null) {
+            return false;
+        }
+        try {
+            String json = new com.google.gson.Gson().toJson(vo);
+            redisTemplate.opsForValue().set(HOSPITAL_STATS_KEY, json);
+            redisTemplate.expire(HOSPITAL_STATS_KEY, Duration.ofDays(30));
+            log.info("医院统计数据已保存到Redis");
+            return true;
+        } catch (Exception e) {
+            log.error("保存医院统计数据到Redis失败", e);
+            return false;
+        }
+    }
+
+    /**
+     * 获取医院统计数据
+     */
+    public HospitalStatsVO getHospitalStatsFromRedis() {
+        if (redisTemplate == null) {
+            return null;
+        }
+        try {
+            Object data = redisTemplate.opsForValue().get(HOSPITAL_STATS_KEY);
+            if (data != null) {
+                return new com.google.gson.Gson().fromJson(data.toString(), HospitalStatsVO.class);
+            }
+        } catch (Exception e) {
+            log.error("获取医院统计数据失败", e);
+        }
+        return null;
+    }
+
+    /**
+     * 保存得分分布数据到Redis
+     */
+    public boolean updateScoreDistributionToRedis(ScoreDistributionVO vo) {
+        if (redisTemplate == null || vo == null) {
+            return false;
+        }
+        try {
+            String json = new com.google.gson.Gson().toJson(vo);
+            redisTemplate.opsForValue().set(SCORE_DISTRIBUTION_KEY, json);
+            redisTemplate.expire(SCORE_DISTRIBUTION_KEY, Duration.ofDays(30));
+            log.info("得分分布数据已保存到Redis");
+            return true;
+        } catch (Exception e) {
+            log.error("保存得分分布数据到Redis失败", e);
+            return false;
+        }
+    }
+
+    /**
+     * 获取得分分布数据
+     */
+    public ScoreDistributionVO getScoreDistributionFromRedis() {
+        if (redisTemplate == null) {
+            return null;
+        }
+        try {
+            Object data = redisTemplate.opsForValue().get(SCORE_DISTRIBUTION_KEY);
+            if (data != null) {
+                return new com.google.gson.Gson().fromJson(data.toString(), ScoreDistributionVO.class);
+            }
+        } catch (Exception e) {
+            log.error("获取得分分布数据失败", e);
+        }
+        return null;
     }
 }

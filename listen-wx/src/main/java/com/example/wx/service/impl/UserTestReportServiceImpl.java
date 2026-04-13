@@ -186,15 +186,12 @@ public class UserTestReportServiceImpl implements UserTestReportService {
                 testItems.add(item);
             }
 
-            // 构建bizParams
-            JsonObject bizParams = new JsonObject();
-            bizParams.addProperty("data", gson.toJson(testItems));
+            String testDataJson = gson.toJson(testItems);
 
             ApplicationParam param = ApplicationParam.builder()
                     .apiKey(analysisApiKey)
                     .appId(analysisAppId)
-                    .prompt("请根据测试数据生成JSON格式的改善建议和分析报告")
-                    .bizParams(bizParams)
+                    .prompt("请根据以下测试数据生成JSON格式的改善建议和分析报告。数据：" + testDataJson)
                     .incrementalOutput(false)
                     .hasThoughts(false)
                     .build();

@@ -551,10 +551,10 @@ public class ElasticsearchAggregationService {
     private BoolQueryBuilder buildDateRangeQuery(String startDate, String endDate) {
         BoolQueryBuilder boolQuery = QueryBuilders.boolQuery();
         if (startDate != null && !startDate.isEmpty()) {
-            boolQuery.must(rangeQuery("testDate").gte(startDate));
+            boolQuery.must(rangeQuery("testDate").gte(startDate).format("yyyy-MM-dd"));
         }
         if (endDate != null && !endDate.isEmpty()) {
-            boolQuery.must(rangeQuery("testDate").lte(endDate));
+            boolQuery.must(rangeQuery("testDate").lte(endDate).format("yyyy-MM-dd"));
         }
         return boolQuery;
     }
@@ -562,10 +562,10 @@ public class ElasticsearchAggregationService {
     private BoolQueryBuilder buildDateRangeQueryForItem(String startDate, String endDate) {
         BoolQueryBuilder boolQuery = QueryBuilders.boolQuery();
         if (startDate != null && !startDate.isEmpty()) {
-            boolQuery.must(rangeQuery("createdAt").gte(startDate));
+            boolQuery.must(rangeQuery("createdAt").gte(startDate).format("yyyy-MM-dd"));
         }
         if (endDate != null && !endDate.isEmpty()) {
-            boolQuery.must(rangeQuery("createdAt").lte(endDate));
+            boolQuery.must(rangeQuery("createdAt").lte(endDate).format("yyyy-MM-dd"));
         }
         return boolQuery;
     }
