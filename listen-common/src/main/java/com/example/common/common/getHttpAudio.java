@@ -11,4 +11,19 @@ public class getHttpAudio {
         return null;
     }
 
+    public static String getLocalPath(String localFilePath) {
+        if(localFilePath!=null){
+            // 提取 userFile 之后的相对路径
+            // 例如: C:/Users/86182/Desktop/work/listen/userFile/ZJZ100861776134586477/2.wav -> /userFile/ZJZ100861776134586477/2.wav
+            String normalizedPath = localFilePath.replace("\\", "/");
+            int userFileIndex = normalizedPath.lastIndexOf("userFile/");
+            if (userFileIndex != -1) {
+                return "http://localhost:8081/" + normalizedPath.substring(userFileIndex);
+            }
+            // 如果找不到 userFile/，直接返回路径部分
+            return "http://localhost:8081/userFile/" + normalizedPath;
+        }
+        return null;
+    }
+
 }

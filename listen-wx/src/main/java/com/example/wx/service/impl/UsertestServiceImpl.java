@@ -118,7 +118,7 @@ public class UsertestServiceImpl extends ServiceImpl<UsertestMapper, Usertest> i
             testDto.setId(testdetail.getId());
             testDto.setTestId(testId);
             testDto.setAudioPath(getHttpAudio.getAudioUrl(audio.getPath()));
-            testDto.setTestAudioPath(getHttpAudio.getAudioUrl(testdetail.getUserAudioPath()));
+            testDto.setTestAudioPath(getHttpAudio.getLocalPath(testdetail.getUserAudioPath()));
             testDtoList.add(testDto);
         }
         redisComponent.deleteIndexDataCache();
@@ -174,7 +174,7 @@ public class UsertestServiceImpl extends ServiceImpl<UsertestMapper, Usertest> i
             testDto.setTestId(testdetail.getTestId());
             Audio audio = audioMapper.selectById(testdetail.getAudioId());
             testDto.setAudioPath(getHttpAudio.getAudioUrl(audio.getPath()));
-            testDto.setTestAudioPath(getHttpAudio.getAudioUrl(testdetail.getUserAudioPath()));
+            testDto.setTestAudioPath(getHttpAudio.getLocalPath(testdetail.getUserAudioPath()));
             testDto.setScore(testdetail.getScore());
             testDto.setTestTime(testdetail.getTestTime());
             testDto.setId(testdetail.getId());
@@ -187,8 +187,15 @@ public class UsertestServiceImpl extends ServiceImpl<UsertestMapper, Usertest> i
     @Override
     public Usertest uploadAll(String testId) {
         Usertest usertest = usertestMapper.selectById(testId);
+      
         if(usertest==null||usertest.getAvgScore()!=0)
             throw new RuntimeException("提交错误");
+        // 等待3秒，确保之前的异步评分任务完成
+        try {
+            Thread.sleep(3000);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
         List<Testdetail> testdetailList = new ArrayList<>();
         testdetailList = testdetailMapper.selectListByTestId(testId);
         int sum = 0;
@@ -239,12 +246,7 @@ public class UsertestServiceImpl extends ServiceImpl<UsertestMapper, Usertest> i
         // 同步到ES
         elasticsearchSyncService.syncTestToEs(testId);
 
-        // 等待3秒，确保之前的异步评分任务完成
-        try {
-            Thread.sleep(3000);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-        }
+
 
         // 生成AI报告
         userTestReportService.generateAndSaveReport(testId);

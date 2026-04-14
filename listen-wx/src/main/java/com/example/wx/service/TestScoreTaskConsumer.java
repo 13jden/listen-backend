@@ -15,7 +15,7 @@ import com.example.wx.pojo.Testdetail;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import javax.sound.sampled.*;
@@ -41,20 +41,14 @@ public class TestScoreTaskConsumer {
     @Value("${ffmpeg.path}")
     private String ffmpegPath;
 
-    @Scheduled(fixedDelay = 500, timeUnit = java.util.concurrent.TimeUnit.MILLISECONDS)
-    public void consumeTasks() {
-        TestScoreTaskMessage message;
-        int count = 0;
-        while ((message = redisComponent.rpopScoreTask()) != null) {
-            count++;
-            try {
-                processTask(message);
-            } catch (Exception e) {
-                log.error("处理评分任务失败: testDetailId={}, error={}", message.getTestDetailId(), e.getMessage(), e);
-            }
-        }
-        if (count > 0) {
-            log.info("本轮消费 {} 条评分任务", count);
+    @Async
+    public void processAsync(TestScoreTaskMessage message) {
+        log.info("异步评分任务开始: testDetailId={}", message.getTestDetailId());
+        try {
+            processTask(message);
+            log.info("异步评分任务完成: testDetailId={}", message.getTestDetailId());
+        } catch (Exception e) {
+            log.error("异步评分任务失败: testDetailId={}, error={}", message.getTestDetailId(), e.getMessage(), e);
         }
     }
 
@@ -174,8 +168,10 @@ public class TestScoreTaskConsumer {
         log.info("异步评分完成: testDetailId={}, score={}", msg.getTestDetailId(), finalScore);
     }
 
-    private float calculateDurationScore(float userDuration, float standardDuration) {
-        if (standardDuration <= 0) return 100f;
+    private float calculateDurationScore(Float userDuration, Float standardDuration) {
+        if (standardDuration == null || standardDuration <= 0) return 100f;
+        if (userDuration == null) return 0f;
+        
         float ratio = userDuration / standardDuration;
         float score;
         if (ratio >= 0.8f && ratio <= 1.2f) {

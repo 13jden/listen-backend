@@ -18,6 +18,8 @@ import org.elasticsearch.search.aggregations.metrics.Cardinality;
 import org.elasticsearch.search.aggregations.metrics.Max;
 import org.elasticsearch.search.aggregations.metrics.Min;
 import org.elasticsearch.search.builder.SearchSourceBuilder;
+import org.elasticsearch.script.Script;
+import org.elasticsearch.script.ScriptType;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -406,10 +408,11 @@ public class ElasticsearchAggregationService {
             sourceBuilder.query(buildDateRangeQuery(startDate, endDate));
             sourceBuilder.size(0);
 
+            // testDate 是 keyword 类型，使用 terms 聚合代替 dateHistogram
             sourceBuilder.aggregation(
-                    AggregationBuilders.dateHistogram("by_date")
+                    AggregationBuilders.terms("by_date")
                             .field("testDate")
-                            .calendarInterval(org.elasticsearch.search.aggregations.bucket.histogram.DateHistogramInterval.DAY)
+                            .size(1000)
                             .subAggregation(AggregationBuilders.cardinality("user_count").field("userId"))
                             .subAggregation(AggregationBuilders.avg("avg_score").field("totalScore"))
                             .subAggregation(AggregationBuilders.terms("by_status").field("completionStatus"))
@@ -419,42 +422,30 @@ public class ElasticsearchAggregationService {
             SearchResponse response = restHighLevelClient.search(searchRequest, RequestOptions.DEFAULT);
 
             Aggregation agg = response.getAggregations().get("by_date");
-            if (agg != null) {
-                try {
-                    java.lang.reflect.Method getBucketsMethod = agg.getClass().getMethod("getBuckets");
-                    Iterable<?> buckets = (Iterable<?>) getBucketsMethod.invoke(agg);
-                    for (Object bucket : buckets) {
-                        java.lang.reflect.Method getKeyMethod = bucket.getClass().getMethod("getKeyAsString");
-                        java.lang.reflect.Method getDocCountMethod = bucket.getClass().getMethod("getDocCount");
-                        java.lang.reflect.Method getAggsMethod = bucket.getClass().getMethod("getAggregations");
-                        
-                        DailyReportVO.DailyReportItem item = new DailyReportVO.DailyReportItem();
-                        item.setDate((String) getKeyMethod.invoke(bucket));
-                        item.setTestCount((Long) getDocCountMethod.invoke(bucket));
-                        
-                        Object aggs = getAggsMethod.invoke(bucket);
-                        java.lang.reflect.Method getAggMethod = aggs.getClass().getMethod("get", String.class);
-                        
-                        Cardinality userCountAgg = (Cardinality) getAggMethod.invoke(aggs, "user_count");
-                        item.setUserCount(userCountAgg != null ? userCountAgg.getValue() : 0);
-                        
-                        Avg avgAgg = (Avg) getAggMethod.invoke(aggs, "avg_score");
-                        item.setAvgScore(avgAgg != null ? avgAgg.getValue() : 0.0);
-                        
-                        Terms statusTerms = (Terms) getAggMethod.invoke(aggs, "by_status");
-                        long completed = 0, total = item.getTestCount();
-                        if (statusTerms != null) {
-                            for (Terms.Bucket statusBucket : statusTerms.getBuckets()) {
-                                if ("completed".equals(statusBucket.getKeyAsString())) {
-                                    completed = statusBucket.getDocCount();
-                                }
+            if (agg != null && agg instanceof Terms) {
+                Terms terms = (Terms) agg;
+                for (Terms.Bucket bucket : terms.getBuckets()) {
+                    DailyReportVO.DailyReportItem item = new DailyReportVO.DailyReportItem();
+                    item.setDate(bucket.getKeyAsString());
+                    item.setTestCount(bucket.getDocCount());
+
+                    Cardinality userCountAgg = bucket.getAggregations().get("user_count");
+                    item.setUserCount(userCountAgg != null ? userCountAgg.getValue() : 0);
+
+                    Avg avgAgg = bucket.getAggregations().get("avg_score");
+                    item.setAvgScore(avgAgg != null ? avgAgg.getValue() : 0.0);
+
+                    Terms statusTerms = bucket.getAggregations().get("by_status");
+                    long completed = 0, total = item.getTestCount();
+                    if (statusTerms != null) {
+                        for (Terms.Bucket statusBucket : statusTerms.getBuckets()) {
+                            if ("completed".equals(statusBucket.getKeyAsString())) {
+                                completed = statusBucket.getDocCount();
                             }
                         }
-                        item.setCompletionRate(total > 0 ? (double) completed / total * 100 : 0.0);
-                        items.add(item);
                     }
-                } catch (Exception e) {
-                    log.warn("每日报表解析失败", e);
+                    item.setCompletionRate(total > 0 ? (double) completed / total * 100 : 0.0);
+                    items.add(item);
                 }
             }
 
@@ -550,12 +541,28 @@ public class ElasticsearchAggregationService {
 
     private BoolQueryBuilder buildDateRangeQuery(String startDate, String endDate) {
         BoolQueryBuilder boolQuery = QueryBuilders.boolQuery();
-        if (startDate != null && !startDate.isEmpty()) {
-            boolQuery.must(rangeQuery("testDate").gte(startDate).format("yyyy-MM-dd"));
+        
+        // testDate 是 keyword 类型，需要使用脚本查询进行范围比较
+        if ((startDate != null && !startDate.isEmpty()) || (endDate != null && !endDate.isEmpty())) {
+            StringBuilder scriptContent = new StringBuilder("doc['testDate'].value");
+            Map<String, Object> params = new HashMap<>();
+            
+            if (startDate != null && !startDate.isEmpty() && endDate != null && !endDate.isEmpty()) {
+                scriptContent = new StringBuilder("doc['testDate'].value >= params.start && doc['testDate'].value <= params.end");
+                params.put("start", startDate);
+                params.put("end", endDate);
+            } else if (startDate != null && !startDate.isEmpty()) {
+                scriptContent = new StringBuilder("doc['testDate'].value >= params.start");
+                params.put("start", startDate);
+            } else if (endDate != null && !endDate.isEmpty()) {
+                scriptContent = new StringBuilder("doc['testDate'].value <= params.end");
+                params.put("end", endDate);
+            }
+            
+            Script script = new Script(ScriptType.INLINE, "painless", scriptContent.toString(), params);
+            boolQuery.must(QueryBuilders.scriptQuery(script));
         }
-        if (endDate != null && !endDate.isEmpty()) {
-            boolQuery.must(rangeQuery("testDate").lte(endDate).format("yyyy-MM-dd"));
-        }
+        
         return boolQuery;
     }
 

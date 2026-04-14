@@ -16,6 +16,7 @@ import com.example.wx.pojo.Audio;
 import com.example.wx.pojo.Testdetail;
 import com.example.wx.mapper.TestdetailMapper;
 import com.example.wx.pojo.Usertest;
+import com.example.wx.service.TestScoreTaskConsumer;
 import com.example.wx.service.TestdetailService;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import lombok.extern.slf4j.Slf4j;
@@ -57,6 +58,9 @@ public class TestdetailServiceImpl extends ServiceImpl<TestdetailMapper, Testdet
 
     @Autowired
     private AliApi aliApi;
+
+    @Autowired
+    private TestScoreTaskConsumer testScoreTaskConsumer;
 
     @Value("${ffmpeg.path}")
     private String ffmpegPath;
@@ -123,7 +127,7 @@ public class TestdetailServiceImpl extends ServiceImpl<TestdetailMapper, Testdet
         }
         testAudio.transferTo(targetFile);
 
-        // 发消息给消费者：消费者处理 ffmpeg转码 + ASR + 评分
+        // 直接调用异步处理：ffmpeg转码 + ASR + 评分
         TestScoreTaskMessage message = TestScoreTaskMessage.builder()
                 .testDetailId(testDetailId)
                 .rawAudioPath(tempPath)
@@ -132,13 +136,13 @@ public class TestdetailServiceImpl extends ServiceImpl<TestdetailMapper, Testdet
                 .audioId(audio.getId())
                 .standardDuration(audio.getDurationSec())
                 .build();
-        redisComponent.lpushScoreTask(message);
-        log.info("消息入队，等待异步处理: testDetailId={}", testDetailId);
+        testScoreTaskConsumer.processAsync(message);
+        log.info("异步评分任务已提交: testDetailId={}", testDetailId);
 
         // 立即返回，前端可轮询或等待推送
         TestDto testDto = CopyTools.copy(testdetail, TestDto.class);
         testDto.setAudioPath(getHttpAudio.getAudioUrl(audio.getPath()));
-        testDto.setTestAudioPath(getHttpAudio.getAudioUrl(fullPath));
+        testDto.setTestAudioPath(getHttpAudio.getLocalPath(fullPath));
         testDto.setScore(null); // 评分异步进行
         return Result.success(testDto);
     }
@@ -157,8 +161,7 @@ public class TestdetailServiceImpl extends ServiceImpl<TestdetailMapper, Testdet
                 TestDto testDto = CopyTools.copy(testdetail, TestDto.class);
                 testDto.setAudioPath(getHttpAudio.getAudioUrl(audio.getPath()));
                 testDto.setScore(testdetail.getScore());
-                testDto.setTestAudioPath(getHttpAudio.getAudioUrl(testdetail.getUserAudioPath()));
-                testDto.setAudioPath(getHttpAudio.getAudioUrl(audio.getPath()));
+                testDto.setTestAudioPath(getHttpAudio.getLocalPath(testdetail.getUserAudioPath()));
                 testDto.setUserText(testdetail.getUserContent());
                 testDto.setTestText(audio.getContent());
                 testDto.setTestTime(testdetail.getTestTime());
@@ -284,7 +287,7 @@ public class TestdetailServiceImpl extends ServiceImpl<TestdetailMapper, Testdet
             userDetailInfo.setUserContent(t.getUserContent());
             userDetailInfo.setScore(t.getScore());
             userDetailInfo.setTime(t.getTestTime());
-            userDetailInfo.setUserAudioPath(getHttpAudio.getAudioUrl(t.getUserAudioPath()));
+            userDetailInfo.setUserAudioPath(getHttpAudio.getLocalPath(t.getUserAudioPath()));
             userDetailInfo.setAudioPath(getHttpAudio.getAudioUrl(audio.getPath()));
             userDetailInfoList.add(userDetailInfo);
         }
@@ -309,7 +312,7 @@ public class TestdetailServiceImpl extends ServiceImpl<TestdetailMapper, Testdet
         info.setIndex(testdetail.getIndex());
         info.setAudioId(testdetail.getAudioId());
         info.setAudioPath(getHttpAudio.getAudioUrl(audio.getPath()));
-        info.setUserAudioPath(getHttpAudio.getAudioUrl(testdetail.getUserAudioPath()));
+        info.setUserAudioPath(getHttpAudio.getLocalPath(testdetail.getUserAudioPath()));
         info.setAudioContent(audio.getContent());
         info.setUserContent(testdetail.getUserContent());
         info.setScore(testdetail.getScore());

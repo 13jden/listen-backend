@@ -87,15 +87,21 @@ public class AIAnalysisService {
         try {
             // 1. 获取聚合数据
             Map<String, Object> aggregationData = collectAggregationData(request);
+            log.info("聚合数据收集完成");
 
             // 2. 构建AI提示词
             String prompt = buildAnalysisPrompt(request, aggregationData);
+            log.info("AI提示词构建完成，长度: {}", prompt.length());
 
             // 3. 调用AI进行分析
             String aiResponse = callAI(prompt);
+            log.info("AI响应收到，响应长度: {}", aiResponse.length());
 
             // 4. 解析AI响应
-            return parseAIResponse(aiResponse);
+            AnalysisResult result = parseAIResponse(aiResponse);
+            log.info("AI分析完成，结果摘要: {}", result.getSummary());
+
+            return result;
 
         } catch (Exception e) {
             log.error("AI辅助分析失败", e);
@@ -139,6 +145,8 @@ public class AIAnalysisService {
             // 统计总计
             var summaryStats = aggregationService.getSummaryStats();
             data.put("summaryStats", summaryStats);
+
+            log.info("聚合数据收集完成，数据类型: {}", data.keySet());
 
         } catch (Exception e) {
             log.error("收集聚合数据失败", e);
@@ -255,10 +263,15 @@ public class AIAnalysisService {
             String appId = analysisAppId;
             String apiKeyValue = analysisApiKey;
 
-            if (appId.isEmpty() || apiKeyValue.isEmpty()) {
-                log.warn("AI分析配置不完整，跳过AI调用");
+            if (appId == null || appId.isEmpty() || apiKeyValue == null || apiKeyValue.isEmpty()) {
+                log.warn("AI分析配置不完整，跳过AI调用 - appId: {}, apiKey: {}", 
+                        appId == null ? "null" : (appId.isEmpty() ? "empty" : "***"),
+                        apiKeyValue == null ? "null" : (apiKeyValue.isEmpty() ? "empty" : "***"));
                 return "{}";
             }
+
+            log.info("开始调用AI分析服务，AppId: {}", appId);
+            log.debug("AI请求提示词: {}", prompt);
 
             JsonObject bizParams = new JsonObject();
             bizParams.addProperty("data", prompt);
@@ -273,7 +286,9 @@ public class AIAnalysisService {
                     .build();
 
             Application application = new Application();
+            log.info("AI请求发送中...");
             ApplicationResult result = application.call(param);
+            log.info("AI请求完成，结果: {}", result);
 
             return extractResult(result);
 
