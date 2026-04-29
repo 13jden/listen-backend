@@ -48,6 +48,8 @@ public class SecurityConfig {
                         .requestMatchers("/checkCode/**").permitAll()
                         // 静态资源
                         .requestMatchers("/static/**", "/assets/**", "/css/**", "/js/**", "/images/**").permitAll()
+                        // Swagger UI 文档
+                        .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**").permitAll()
                         // 允许所有 OPTIONS 请求（跨域预检）
                         .requestMatchers(org.springframework.http.HttpMethod.OPTIONS, "/**").permitAll()
                         // 开发环境开放所有接口（生产环境需改为 .requestMatchers("/**").permitAll()）

@@ -8,6 +8,9 @@ import com.example.common.dto.IndexDataVO;
 import com.example.common.dto.TokenAdminDto;
 import com.example.common.redis.RedisComponent;
 import com.example.wx.service.AdminService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -17,6 +20,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+@Tag(name = "管理员接口")
 @RestController
 @RequestMapping("/admin")
 @RequiredArgsConstructor
@@ -25,10 +29,11 @@ public class AdminController {
     private final RedisComponent redisComponent;
     private final ControllerTool controllerTool;
 
+    @Operation(summary = "管理员登录", description = "使用用户名密码和验证码登录")
     @PostMapping("/login")
     public Result login(HttpServletRequest request,
                         HttpServletResponse response,
-                        @RequestBody AdminLoginDTO loginDTO) {
+                        @Parameter(description = "登录信息") @RequestBody AdminLoginDTO loginDTO) {
         String checkCode = loginDTO.getCheckCode();
         String checkCodeKey = loginDTO.getCheckCodeKey();
 
@@ -57,6 +62,7 @@ public class AdminController {
         return Result.success(admin);
     }
 
+    @Operation(summary = "获取首页数据", description = "获取仪表盘统计数据")
     @RequestMapping("getIndexdata")
     public Result getIndexdata() {
         IndexDataVO indexData = adminService.getIndexData();

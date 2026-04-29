@@ -1,4 +1,4 @@
-package com.example.admin.service;
+package com.example.wx.Agent;
 
 import com.alibaba.dashscope.app.Application;
 import com.alibaba.dashscope.app.ApplicationOutput;
@@ -9,7 +9,7 @@ import com.alibaba.dashscope.exception.NoApiKeyException;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
-import com.example.admin.service.dto.ChatRequest;
+import com.example.wx.Agent.dto.ChatRequest;
 import com.example.wx.mapper.TestdetailMapper;
 import com.example.wx.mapper.UsertestMapper;
 import com.example.wx.mapper.UserTestReportMapper;

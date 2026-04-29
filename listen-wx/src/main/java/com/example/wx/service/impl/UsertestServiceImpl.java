@@ -301,7 +301,9 @@ public class UsertestServiceImpl extends ServiceImpl<UsertestMapper, Usertest> i
     @Override
     public IPage<UserTestDto> getUserTest(int pageNum, int pageSize) {
         Page<Usertest> usertestPage = new Page<>(pageNum,pageSize);
-        IPage<Usertest> usertestIPage = usertestMapper.selectPage(usertestPage,null);
+        QueryWrapper<Usertest> queryWrapper = new QueryWrapper<>();
+        queryWrapper.orderByDesc("test_time");
+        IPage<Usertest> usertestIPage = usertestMapper.selectPage(usertestPage, queryWrapper);
         return usertestIPage.convert(usertest -> {
             UserTestDto userTestDto = new UserTestDto();
             User user = userMapper.selectById(usertest.getUserId());

@@ -121,30 +121,57 @@ public class AIAnalysisService {
             // 年龄分布
             var ageDist = aggregationService.getAgeGroupDistribution(request.getStartDate(), request.getEndDate());
             data.put("ageDistribution", ageDist);
+            log.info("年龄分布查询结果: 总条目数={}", ageDist != null && ageDist.getData() != null ? ageDist.getData().size() : 0);
+            if (ageDist != null && ageDist.getData() != null) {
+                for (var item : ageDist.getData()) {
+                    log.info("  - {}: {}人, 平均分 {}", item.getAgeGroup(), item.getCount(), item.getAvgScore());
+                }
+            }
 
             // 月度趋势
             var monthlyTrend = aggregationService.getMonthlyTrend(request.getStartDate(), request.getEndDate());
             data.put("monthlyTrend", monthlyTrend);
+            log.info("月度趋势查询结果: 月份数={}", monthlyTrend != null && monthlyTrend.getMonths() != null ? monthlyTrend.getMonths().size() : 0);
+            if (monthlyTrend != null && monthlyTrend.getMonths() != null) {
+                for (int i = 0; i < Math.min(3, monthlyTrend.getMonths().size()); i++) {
+                    String month = monthlyTrend.getMonths().get(i);
+                    Long count = i < monthlyTrend.getTestCounts().size() ? monthlyTrend.getTestCounts().get(i) : 0L;
+                    Double avg = i < monthlyTrend.getAvgScores().size() ? monthlyTrend.getAvgScores().get(i) : 0.0;
+                    log.info("  - {}: {}次, 平均分 {}", month, count, avg);
+                }
+            }
 
             // 完成状态
             var completionStatus = aggregationService.getCompletionStatus(request.getStartDate(), request.getEndDate());
             data.put("completionStatus", completionStatus);
+            log.info("完成状态: 已完成={}, 进行中={}, 未开始={}", completionStatus.getCompleted(), completionStatus.getInProgress(), completionStatus.getNotStarted());
 
             // 错误类型
             var errorTypes = aggregationService.getErrorTypeDistribution(request.getStartDate(), request.getEndDate());
             data.put("errorTypes", errorTypes);
+            log.info("错误类型查询结果: 总条目数={}", errorTypes != null && errorTypes.getData() != null ? errorTypes.getData().size() : 0);
+            if (errorTypes != null && errorTypes.getData() != null && !errorTypes.getData().isEmpty()) {
+                for (int i = 0; i < Math.min(3, errorTypes.getData().size()); i++) {
+                    var item = errorTypes.getData().get(i);
+                    log.info("  - {}: {}次", item.getErrorType(), item.getCount());
+                }
+            }
 
             // 医院统计
             var hospitalStats = aggregationService.getHospitalStats(request.getStartDate(), request.getEndDate());
             data.put("hospitalStats", hospitalStats);
+            log.info("医院统计查询结果: 医院数={}", hospitalStats != null && hospitalStats.getData() != null ? hospitalStats.getData().size() : 0);
 
             // 得分分布
             var scoreDist = aggregationService.getScoreDistribution(request.getStartDate(), request.getEndDate());
             data.put("scoreDistribution", scoreDist);
+            log.info("得分分布查询结果: 区间数={}", scoreDist != null && scoreDist.getRanges() != null ? scoreDist.getRanges().size() : 0);
 
             // 统计总计
             var summaryStats = aggregationService.getSummaryStats();
             data.put("summaryStats", summaryStats);
+            log.info("统计总计: 总用户={}, 总测试={}, 平均分={}", 
+                    summaryStats.getTotalUsers(), summaryStats.getTotalTests(), summaryStats.getAvgScore());
 
             log.info("聚合数据收集完成，数据类型: {}", data.keySet());
 
@@ -274,12 +301,11 @@ public class AIAnalysisService {
             log.debug("AI请求提示词: {}", prompt);
 
             JsonObject bizParams = new JsonObject();
-            bizParams.addProperty("data", prompt);
 
             ApplicationParam param = ApplicationParam.builder()
                     .apiKey(apiKeyValue)
                     .appId(appId)
-                    .prompt("请分析以下数据并返回JSON格式的建议")
+                    .prompt(prompt)
                     .bizParams(bizParams)
                     .incrementalOutput(false)
                     .hasThoughts(false)

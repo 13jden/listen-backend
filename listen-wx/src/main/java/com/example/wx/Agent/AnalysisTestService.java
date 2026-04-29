@@ -1,4 +1,4 @@
-package com.example.admin.service;
+package com.example.wx.Agent;
 
 import com.example.wx.elasticsearch.service.DailyAnalysisTask;
 import com.example.wx.elasticsearch.vo.*;

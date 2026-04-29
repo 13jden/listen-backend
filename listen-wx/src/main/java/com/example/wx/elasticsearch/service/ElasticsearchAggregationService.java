@@ -9,6 +9,7 @@ import org.elasticsearch.client.RequestOptions;
 import org.elasticsearch.client.RestHighLevelClient;
 import org.elasticsearch.index.query.BoolQueryBuilder;
 import org.elasticsearch.index.query.QueryBuilders;
+import org.elasticsearch.index.query.RangeQueryBuilder;
 import org.elasticsearch.search.aggregations.Aggregation;
 import org.elasticsearch.search.aggregations.AggregationBuilders;
 import org.elasticsearch.search.aggregations.bucket.range.RangeAggregationBuilder;
@@ -18,8 +19,6 @@ import org.elasticsearch.search.aggregations.metrics.Cardinality;
 import org.elasticsearch.search.aggregations.metrics.Max;
 import org.elasticsearch.search.aggregations.metrics.Min;
 import org.elasticsearch.search.builder.SearchSourceBuilder;
-import org.elasticsearch.script.Script;
-import org.elasticsearch.script.ScriptType;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -100,9 +99,9 @@ public class ElasticsearchAggregationService {
                     Min minAgg = bucket.getAggregations().get("min_score");
                     Avg avgAgg = bucket.getAggregations().get("avg_score");
                     
-                    double maxScore = maxAgg != null ? maxAgg.getValue() : 0.0;
-                    double minScore = minAgg != null ? minAgg.getValue() : 0.0;
-                    double avgScore = avgAgg != null ? avgAgg.getValue() : 0.0;
+                    double maxScore = maxAgg != null && isValidDouble(maxAgg.getValue()) ? maxAgg.getValue() : 0.0;
+                    double minScore = minAgg != null && isValidDouble(minAgg.getValue()) ? minAgg.getValue() : 0.0;
+                    double avgScore = avgAgg != null && isValidDouble(avgAgg.getValue()) ? avgAgg.getValue() : 0.0;
 
                     ageGroupCount.put(groupName, ageGroupCount.get(groupName) + count);
                     if (maxScore > ageGroupMaxScore.get(groupName)) {
@@ -190,7 +189,7 @@ public class ElasticsearchAggregationService {
                     testCounts.add(bucket.getDocCount());
                     
                     Avg avgAgg = bucket.getAggregations().get("avg_score");
-                    avgScores.add(avgAgg != null ? avgAgg.getValue() : 0.0);
+                    avgScores.add(avgAgg != null && isValidDouble(avgAgg.getValue()) ? avgAgg.getValue() : 0.0);
                 }
             }
 
@@ -323,7 +322,7 @@ public class ElasticsearchAggregationService {
                     item.setUserCount(cardinality != null ? cardinality.getValue() : 0);
 
                     Avg avgAgg = bucket.getAggregations().get("avg_score");
-                    item.setAvgScore(avgAgg != null ? avgAgg.getValue() : 0.0);
+                    item.setAvgScore(avgAgg != null && isValidDouble(avgAgg.getValue()) ? avgAgg.getValue() : 0.0);
                     items.add(item);
                 }
             }
@@ -433,7 +432,7 @@ public class ElasticsearchAggregationService {
                     item.setUserCount(userCountAgg != null ? userCountAgg.getValue() : 0);
 
                     Avg avgAgg = bucket.getAggregations().get("avg_score");
-                    item.setAvgScore(avgAgg != null ? avgAgg.getValue() : 0.0);
+                    item.setAvgScore(avgAgg != null && isValidDouble(avgAgg.getValue()) ? avgAgg.getValue() : 0.0);
 
                     Terms statusTerms = bucket.getAggregations().get("by_status");
                     long completed = 0, total = item.getTestCount();
@@ -491,7 +490,8 @@ public class ElasticsearchAggregationService {
             avgRequest.source(avgSource);
             SearchResponse avgResponse = restHighLevelClient.search(avgRequest, RequestOptions.DEFAULT);
             Avg avgAgg = avgResponse.getAggregations().get("avg_score");
-            vo.setAvgScore(avgAgg != null ? avgAgg.getValue() : 0.0);
+            double avgScoreValue = avgAgg != null ? avgAgg.getValue() : 0.0;
+            vo.setAvgScore(isValidDouble(avgScoreValue) ? avgScoreValue : 0.0);
 
             // 每日分数提升
             vo.setScoreImprovement(calculateDailyScoreImprovement());
@@ -541,28 +541,26 @@ public class ElasticsearchAggregationService {
 
     private BoolQueryBuilder buildDateRangeQuery(String startDate, String endDate) {
         BoolQueryBuilder boolQuery = QueryBuilders.boolQuery();
-        
-        // testDate 是 keyword 类型，需要使用脚本查询进行范围比较
+
         if ((startDate != null && !startDate.isEmpty()) || (endDate != null && !endDate.isEmpty())) {
-            StringBuilder scriptContent = new StringBuilder("doc['testDate'].value");
-            Map<String, Object> params = new HashMap<>();
-            
-            if (startDate != null && !startDate.isEmpty() && endDate != null && !endDate.isEmpty()) {
-                scriptContent = new StringBuilder("doc['testDate'].value >= params.start && doc['testDate'].value <= params.end");
-                params.put("start", startDate);
-                params.put("end", endDate);
-            } else if (startDate != null && !startDate.isEmpty()) {
-                scriptContent = new StringBuilder("doc['testDate'].value >= params.start");
-                params.put("start", startDate);
-            } else if (endDate != null && !endDate.isEmpty()) {
-                scriptContent = new StringBuilder("doc['testDate'].value <= params.end");
-                params.put("end", endDate);
+            // 直接使用 rangeQuery 对 keyword 类型的 testDate 字段进行字典序范围比较
+            // 不再使用 Painless 脚本，避免 doc['field'].value 在字段缺失时抛异常导致 all shards failed
+            RangeQueryBuilder rangeBuilder = QueryBuilders.rangeQuery("testDate");
+            boolean hasStart = startDate != null && !startDate.isEmpty();
+            boolean hasEnd = endDate != null && !endDate.isEmpty();
+
+            if (hasStart && hasEnd) {
+                // 双向范围查询
+                rangeBuilder.gte(startDate).lte(endDate);
+            } else if (hasStart) {
+                rangeBuilder.gte(startDate);
+            } else if (hasEnd) {
+                rangeBuilder.lte(endDate);
             }
-            
-            Script script = new Script(ScriptType.INLINE, "painless", scriptContent.toString(), params);
-            boolQuery.must(QueryBuilders.scriptQuery(script));
+
+            boolQuery.must(rangeBuilder);
         }
-        
+
         return boolQuery;
     }
 
@@ -575,5 +573,9 @@ public class ElasticsearchAggregationService {
             boolQuery.must(rangeQuery("createdAt").lte(endDate).format("yyyy-MM-dd"));
         }
         return boolQuery;
+    }
+
+    private boolean isValidDouble(double value) {
+        return !Double.isNaN(value) && !Double.isInfinite(value);
     }
 }

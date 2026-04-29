@@ -1,4 +1,4 @@
-package com.example.admin.service.dto;
+package com.example.wx.Agent.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;

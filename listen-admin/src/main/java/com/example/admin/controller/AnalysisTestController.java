@@ -1,6 +1,6 @@
 package com.example.admin.controller;
 
-import com.example.admin.service.AnalysisTestService;
+import com.example.wx.Agent.AnalysisTestService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
